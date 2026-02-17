@@ -1,0 +1,41 @@
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import useAuthStore from './store/authStore';
+import LoginPage from './pages/LoginPage';
+import OrdersPage from './pages/OrdersPage';
+import MenuManagementPage from './pages/MenuManagementPage';
+import TablesPage from './pages/TablesPage';
+import DashboardLayout from './layouts/DashboardLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+
+function App() {
+  const initAuth = useAuthStore((s) => s.initAuth);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="orders" element={<OrdersPage />} />
+          <Route path="menu" element={<MenuManagementPage />} />
+          <Route path="tables" element={<TablesPage />} />
+          <Route index element={<Navigate to="orders" replace />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
