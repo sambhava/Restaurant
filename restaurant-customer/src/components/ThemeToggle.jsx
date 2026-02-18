@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ restaurantId, tableNumber }) {
+    const storageKey = `theme_${restaurantId}_${tableNumber}`;
+
     const [dark, setDark] = useState(() => {
-        const saved = localStorage.getItem('theme');
-        return saved === 'dark';
+        const saved = localStorage.getItem(storageKey);
+        // Default to dark if nothing saved
+        return saved ? saved === 'dark' : true;
     });
 
     useEffect(() => {
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        localStorage.setItem('theme', dark ? 'dark' : 'light');
-    }, [dark]);
+        // Toggle class on body/html
+        if (dark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+        localStorage.setItem(storageKey, dark ? 'dark' : 'light');
+    }, [dark, storageKey]);
 
     return (
         <button

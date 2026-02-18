@@ -10,16 +10,17 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import OrderCard from '../components/OrderCard';
-
-const RESTAURANT_ID = 'rest_test123';
+import useAuthStore from '../store/authStore';
 
 export default function OrdersPage() {
+    const restaurantId = useAuthStore((s) => s.restaurantId);
     const [orders, setOrders] = useState([]);
     const [filter, setFilter] = useState('all');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const ordersRef = collection(db, 'restaurants', RESTAURANT_ID, 'orders');
+        if (!restaurantId) return;
+        const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
         const q = query(ordersRef, orderBy('orderedAt', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -34,11 +35,11 @@ export default function OrdersPage() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [restaurantId]);
 
     const handleStatusUpdate = async (orderId, newStatus) => {
         try {
-            const orderRef = doc(db, 'restaurants', RESTAURANT_ID, 'orders', orderId);
+            const orderRef = doc(db, 'restaurants', restaurantId, 'orders', orderId);
             await updateDoc(orderRef, {
                 status: newStatus,
                 updatedAt: new Date(),

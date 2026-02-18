@@ -114,6 +114,7 @@ export async function addOrderToSession(restaurantId, sessionId, orderId, orderT
  * Fetch the current active session for a table.
  */
 export async function getActiveSession(restaurantId, tableNumber) {
+    // 1. Try localStorage first for fast lookup
     const stored = localStorage.getItem(SESSION_KEY);
     if (stored) {
         const parsed = JSON.parse(stored);
@@ -124,7 +125,33 @@ export async function getActiveSession(restaurantId, tableNumber) {
                 return { id: sessionSnap.id, ...sessionSnap.data() };
             }
         }
+        // Stored session is stale, clear it
+        localStorage.removeItem(SESSION_KEY);
     }
+
+    // 2. Fall back to Firestore query — find any active session for this table
+    const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
+    const q = query(
+        sessionsRef,
+        where('tableNumber', '==', tableNumber),
+        where('status', '==', 'active')
+    );
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+        const activeSession = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        // Cache it in localStorage for next time
+        localStorage.setItem(
+            SESSION_KEY,
+            JSON.stringify({
+                sessionId: activeSession.id,
+                restaurantId,
+                tableNumber,
+            })
+        );
+        return activeSession;
+    }
+
     return null;
 }
 

@@ -3,11 +3,22 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebas
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
-const RESTAURANT_ID = 'rest_test123';
+/**
+ * Generate a unique restaurant ID for new users.
+ */
+function generateRestaurantId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let id = 'rest_';
+    for (let i = 0; i < 12; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+}
 
 const useAuthStore = create((set, get) => ({
     user: null,
     userProfile: null,
+    restaurantId: localStorage.getItem('restaurantId') || '',
     restaurantName: localStorage.getItem('restaurantName') || '',
     loading: true,
     error: null,
@@ -22,15 +33,23 @@ const useAuthStore = create((set, get) => ({
                     set({
                         user,
                         userProfile: profile,
+                        restaurantId: profile.restaurantId || localStorage.getItem('restaurantId') || '',
                         restaurantName: profile.restaurantName || localStorage.getItem('restaurantName') || '',
                         loading: false,
                         error: null,
                     });
+                    // Sync localStorage
+                    if (profile.restaurantId) {
+                        localStorage.setItem('restaurantId', profile.restaurantId);
+                    }
+                    if (profile.restaurantName) {
+                        localStorage.setItem('restaurantName', profile.restaurantName);
+                    }
                 } catch {
                     set({ user, userProfile: { role: 'staff' }, loading: false });
                 }
             } else {
-                set({ user: null, userProfile: null, loading: false });
+                set({ user: null, userProfile: null, restaurantId: '', restaurantName: '', loading: false });
             }
         });
     },
@@ -39,29 +58,53 @@ const useAuthStore = create((set, get) => ({
         try {
             set({ loading: true, error: null });
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const uid = userCredential.user.uid;
 
-            // Save restaurant name to user profile AND restaurant document
-            if (restaurantName) {
-                await setDoc(doc(db, 'users', userCredential.user.uid), {
+            // Check if user already has a restaurantId
+            let restaurantId = '';
+            const existingProfile = await getDoc(doc(db, 'users', uid));
+            if (existingProfile.exists() && existingProfile.data().restaurantId) {
+                // User already has a restaurant assigned
+                restaurantId = existingProfile.data().restaurantId;
+                restaurantName = existingProfile.data().restaurantName || restaurantName;
+            } else if (existingProfile.exists()) {
+                // Migration: existing user from before multi-restaurant update
+                // Link them to the original restaurant
+                restaurantId = 'rest_test123';
+            } else {
+                // Brand new user — generate a new restaurant ID
+                restaurantId = generateRestaurantId();
+            }
+
+            // Immediately set user so dashboard can render
+            set({
+                user: userCredential.user,
+                userProfile: { email, restaurantName, restaurantId, role: 'owner' },
+                restaurantId,
+                restaurantName: restaurantName || '',
+                loading: false,
+                error: null,
+            });
+
+            localStorage.setItem('restaurantId', restaurantId);
+            localStorage.setItem('restaurantName', restaurantName || '');
+
+            // Save to Firestore in background (non-blocking)
+            Promise.all([
+                setDoc(doc(db, 'users', uid), {
                     email,
                     restaurantName,
+                    restaurantId,
                     role: 'owner',
                     lastLogin: new Date(),
-                }, { merge: true });
-
-                // Also update the restaurant document so the customer app sees the name
-                await updateDoc(doc(db, 'restaurants', RESTAURANT_ID), {
+                }, { merge: true }),
+                // Create/update the restaurant document
+                setDoc(doc(db, 'restaurants', restaurantId), {
                     name: restaurantName,
-                }).catch(() => {
-                    // If doc doesn't exist yet, create it
-                    return setDoc(doc(db, 'restaurants', RESTAURANT_ID), {
-                        name: restaurantName,
-                    }, { merge: true });
-                });
+                    ownerId: uid,
+                }, { merge: true }),
+            ]).catch(console.error);
 
-                localStorage.setItem('restaurantName', restaurantName);
-                set({ restaurantName });
-            }
         } catch (err) {
             set({ error: err.message, loading: false });
             throw err;
@@ -72,7 +115,8 @@ const useAuthStore = create((set, get) => ({
         try {
             await signOut(auth);
             localStorage.removeItem('restaurantName');
-            set({ restaurantName: '' });
+            localStorage.removeItem('restaurantId');
+            set({ restaurantName: '', restaurantId: '' });
         } catch (err) {
             console.error('Logout error:', err);
         }

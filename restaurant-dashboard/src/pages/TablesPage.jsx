@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { encodeOrderToken } from '../utils/tokenUtils';
 import {
     collection,
     getDocs,
     doc,
     updateDoc,
+    setDoc,
     query,
     where,
     getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-
-const RESTAURANT_ID = 'rest_test123';
+import useAuthStore from '../store/authStore';
 
 export default function TablesPage() {
-    const [tableCount, setTableCount] = useState(10);
+    const restaurantId = useAuthStore((s) => s.restaurantId);
+    const restaurantName = useAuthStore((s) => s.restaurantName);
+    const [tableCount, setTableCount] = useState(0);
     const [sessions, setSessions] = useState({});
     const [selectedTable, setSelectedTable] = useState(null);
     const [tableOrders, setTableOrders] = useState([]);
@@ -25,7 +28,32 @@ export default function TablesPage() {
 
     useEffect(() => {
         fetchSessions();
+        // Load saved table count from Firestore
+        const loadTableCount = async () => {
+            try {
+                const restDoc = await getDoc(doc(db, 'restaurants', restaurantId));
+                if (restDoc.exists() && restDoc.data().tableCount) {
+                    setTableCount(restDoc.data().tableCount);
+                } else {
+                    setTableCount(10); // default
+                }
+            } catch {
+                setTableCount(10);
+            }
+        };
+        loadTableCount();
     }, []);
+
+    const handleTableCountChange = async (value) => {
+        const count = parseInt(value) || 1;
+        setTableCount(count);
+        // Save to Firestore
+        try {
+            await setDoc(doc(db, 'restaurants', restaurantId), { tableCount: count }, { merge: true });
+        } catch (err) {
+            console.error('Error saving table count:', err);
+        }
+    };
 
     // When a table is selected, fetch its orders
     useEffect(() => {
@@ -38,7 +66,7 @@ export default function TablesPage() {
 
     const fetchSessions = async () => {
         try {
-            const sessionsRef = collection(db, 'restaurants', RESTAURANT_ID, 'sessions');
+            const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
             const q = query(sessionsRef, where('status', '==', 'active'));
             const snapshot = await getDocs(q);
             const sessionMap = {};
@@ -63,7 +91,7 @@ export default function TablesPage() {
         try {
             const orders = [];
             for (const orderId of session.orderIds) {
-                const orderRef = doc(db, 'restaurants', RESTAURANT_ID, 'orders', orderId);
+                const orderRef = doc(db, 'restaurants', restaurantId, 'orders', orderId);
                 const orderSnap = await getDoc(orderRef);
                 if (orderSnap.exists()) {
                     orders.push({ id: orderSnap.id, ...orderSnap.data() });
@@ -82,9 +110,12 @@ export default function TablesPage() {
         if (!session) return;
         if (!confirm(`Close the bill for Table ${tableNum}? Total: ₹${session.total?.toFixed(0)}`)) return;
 
+        // Print bill before closing (uses current tableOrders state)
+        printBill(tableNum);
+
         try {
             // 1. Close the session
-            const sessionRef = doc(db, 'restaurants', RESTAURANT_ID, 'sessions', session.id);
+            const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', session.id);
             await updateDoc(sessionRef, {
                 status: 'closed',
                 endedAt: new Date(),
@@ -94,7 +125,7 @@ export default function TablesPage() {
             // 2. Mark all orders in this session as 'closed' so they leave Live Orders
             if (session.orderIds && session.orderIds.length > 0) {
                 const updatePromises = session.orderIds.map((orderId) => {
-                    const orderRef = doc(db, 'restaurants', RESTAURANT_ID, 'orders', orderId);
+                    const orderRef = doc(db, 'restaurants', restaurantId, 'orders', orderId);
                     return updateDoc(orderRef, { status: 'closed' });
                 });
                 await Promise.all(updatePromises);
@@ -108,7 +139,112 @@ export default function TablesPage() {
     };
 
     const getQrUrl = (tableNum) => {
-        return `${customerAppUrl}/order?r=${RESTAURANT_ID}&t=${tableNum}`;
+        const token = encodeOrderToken(restaurantId, tableNum);
+        return `${customerAppUrl}/order?token=${token}`;
+    };
+
+    const printBill = (tableNum) => {
+        const session = sessions[tableNum];
+        if (!session || tableOrders.length === 0) return;
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        // Build item rows from all orders
+        const allItems = [];
+        tableOrders.forEach((order) => {
+            order.items?.forEach((item) => {
+                const existing = allItems.find((i) => i.name === item.name && i.price === item.price);
+                if (existing) {
+                    existing.quantity += item.quantity;
+                    existing.subtotal += item.subtotal;
+                } else {
+                    allItems.push({ ...item });
+                }
+            });
+        });
+
+        const itemRows = allItems.map((item) => `
+            <tr>
+                <td style="padding:6px 0;border-bottom:1px dashed #ddd;">${item.name}</td>
+                <td style="padding:6px 8px;border-bottom:1px dashed #ddd;text-align:center;">${item.quantity}</td>
+                <td style="padding:6px 0;border-bottom:1px dashed #ddd;text-align:right;">₹${item.subtotal?.toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        const billHTML = `
+        <html>
+        <head>
+            <title>Bill - Table ${tableNum}</title>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body {
+                    font-family: 'Courier New', monospace;
+                    max-width: 320px;
+                    margin: 0 auto;
+                    padding: 20px 16px;
+                    color: #111;
+                }
+                .header { text-align:center; margin-bottom:16px; }
+                .header h1 { font-size:20px; margin-bottom:2px; }
+                .header p { font-size:11px; color:#555; }
+                .divider { border:none; border-top:1px dashed #999; margin:10px 0; }
+                .info-row { display:flex; justify-content:space-between; font-size:12px; color:#444; margin-bottom:4px; }
+                table { width:100%; border-collapse:collapse; font-size:13px; margin:8px 0; }
+                th { text-align:left; font-size:11px; color:#666; padding-bottom:6px; border-bottom:2px solid #333; }
+                th:nth-child(2) { text-align:center; }
+                th:last-child { text-align:right; }
+                .summary { margin-top:8px; }
+                .summary-row { display:flex; justify-content:space-between; font-size:13px; padding:3px 0; }
+                .summary-row.total { font-size:16px; font-weight:bold; border-top:2px solid #333; padding-top:8px; margin-top:6px; }
+                .footer { text-align:center; margin-top:24px; font-size:14px; font-weight:bold; letter-spacing:0.5px; }
+                .footer-sub { text-align:center; font-size:10px; color:#888; margin-top:4px; }
+                @media print {
+                    body { padding:0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${restaurantName || 'Restaurant'}</h1>
+                <p>Tax Invoice / Bill of Supply</p>
+            </div>
+
+            <hr class="divider" />
+
+            <div class="info-row"><span>Table: ${tableNum}</span><span>Date: ${dateStr}</span></div>
+            <div class="info-row"><span>Bill #: ${session.id?.slice(-6).toUpperCase()}</span><span>Time: ${timeStr}</span></div>
+
+            <hr class="divider" />
+
+            <table>
+                <thead>
+                    <tr><th>Item</th><th>Qty</th><th>Amount</th></tr>
+                </thead>
+                <tbody>
+                    ${itemRows}
+                </tbody>
+            </table>
+
+            <div class="summary">
+                <div class="summary-row"><span>Subtotal</span><span>₹${session.subtotal?.toFixed(2)}</span></div>
+                <div class="summary-row"><span>GST (5%)</span><span>₹${session.tax?.toFixed(2)}</span></div>
+                <div class="summary-row total"><span>Total</span><span>₹${session.total?.toFixed(2)}</span></div>
+            </div>
+
+            <hr class="divider" />
+
+            <div class="footer">✨ Please Visit Again ✨</div>
+            <div class="footer-sub">Thank you for dining with us!</div>
+        </body>
+        </html>
+        `;
+
+        const w = window.open('', '_blank');
+        w.document.write(billHTML);
+        w.document.write('<script>window.onload = function() { window.print(); window.close(); }</script>');
+        w.document.close();
     };
 
     const formatTime = (timestamp) => {
@@ -139,7 +275,7 @@ export default function TablesPage() {
                         min="1"
                         max="100"
                         value={tableCount}
-                        onChange={(e) => setTableCount(parseInt(e.target.value) || 1)}
+                        onChange={(e) => handleTableCountChange(e.target.value)}
                         className="table-count-input"
                     />
                 </div>

@@ -1,12 +1,15 @@
 import useCart from '../hooks/useCart';
 
-export default function MenuItem({ item }) {
+export default function MenuItem({ item, isBestseller }) {
     const { items, addItem, updateQuantity } = useCart();
     const cartItem = items.find((i) => i.id === item.id);
     const quantity = cartItem ? cartItem.quantity : 0;
 
     return (
-        <div className="menu-item-card">
+        <div className={`menu-item-card ${isBestseller ? 'bestseller' : ''}`}>
+            {isBestseller && (
+                <span className="bestseller-badge">⭐ Bestseller</span>
+            )}
             {item.image && (
                 <div className="menu-item-image">
                     <img src={item.image} alt={item.name} loading="lazy" />

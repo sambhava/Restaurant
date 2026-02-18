@@ -8,10 +8,10 @@ import {
     deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-
-const RESTAURANT_ID = 'rest_test123';
+import useAuthStore from '../store/authStore';
 
 export default function MenuManagementPage() {
+    const restaurantId = useAuthStore((s) => s.restaurantId);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -27,7 +27,7 @@ export default function MenuManagementPage() {
 
     const fetchItems = async () => {
         try {
-            const ref = collection(db, 'restaurants', RESTAURANT_ID, 'menuItems');
+            const ref = collection(db, 'restaurants', restaurantId, 'menuItems');
             const snapshot = await getDocs(ref);
             setItems(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
@@ -60,9 +60,9 @@ export default function MenuManagementPage() {
 
         try {
             if (editingItem) {
-                await updateDoc(doc(db, 'restaurants', RESTAURANT_ID, 'menuItems', editingItem.id), data);
+                await updateDoc(doc(db, 'restaurants', restaurantId, 'menuItems', editingItem.id), data);
             } else {
-                await addDoc(collection(db, 'restaurants', RESTAURANT_ID, 'menuItems'), data);
+                await addDoc(collection(db, 'restaurants', restaurantId, 'menuItems'), data);
             }
             resetForm();
             fetchItems();
@@ -87,7 +87,7 @@ export default function MenuManagementPage() {
     const handleDelete = async (id) => {
         if (!confirm('Delete this item?')) return;
         try {
-            await deleteDoc(doc(db, 'restaurants', RESTAURANT_ID, 'menuItems', id));
+            await deleteDoc(doc(db, 'restaurants', restaurantId, 'menuItems', id));
             fetchItems();
         } catch (err) {
             console.error('Error deleting:', err);
@@ -96,7 +96,7 @@ export default function MenuManagementPage() {
 
     const toggleAvailability = async (item) => {
         try {
-            await updateDoc(doc(db, 'restaurants', RESTAURANT_ID, 'menuItems', item.id), {
+            await updateDoc(doc(db, 'restaurants', restaurantId, 'menuItems', item.id), {
                 isAvailable: !item.isAvailable,
             });
             fetchItems();
@@ -230,8 +230,8 @@ export default function MenuManagementPage() {
                                             >
                                                 {item.isAvailable ? '✓' : '✕'}
                                             </button>
-                                            <button className="edit-btn" onClick={() => handleEdit(item)}>✏️</button>
-                                            <button className="delete-btn" onClick={() => handleDelete(item.id)}>🗑️</button>
+                                            <button className="edit-btn" onClick={() => handleEdit(item)} title="Edit">✏️</button>
+                                            <button className="delete-btn" onClick={() => handleDelete(item.id)} title="Delete">🗑️</button>
                                         </div>
                                     </div>
                                 ))}
