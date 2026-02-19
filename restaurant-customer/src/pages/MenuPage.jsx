@@ -26,6 +26,8 @@ export default function MenuPage() {
         sessionStorage.setItem('splashShown', '1');
         return true;
     });
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const setOrderContext = useCartStore((s) => s.setOrderContext);
 
     useEffect(() => {
@@ -93,18 +95,27 @@ export default function MenuPage() {
     }, [refreshSession]);
 
     const filteredItems = useMemo(() => {
-        const base =
-            activeCategory === 'all'
-                ? menuItems
-                : menuItems.filter((item) => item.category === activeCategory);
+        let base = menuItems;
+
+        // If searching, ignore category and filter by name
+        if (searchTerm.trim()) {
+            const lowerTerm = searchTerm.toLowerCase();
+            base = base.filter(item => item.name.toLowerCase().includes(lowerTerm));
+        } else if (activeCategory !== 'all') {
+            // Otherwise filter by category
+            base = base.filter((item) => item.category === activeCategory);
+        }
+
         if (!bestsellerItemId) return base;
-        // Put bestseller first
+
+        // Put bestseller first (only if not searching, or keep it?)
+        // Let's keep bestseller logic even in search if it matches
         return [...base].sort((a, b) => {
             if (a.id === bestsellerItemId) return -1;
             if (b.id === bestsellerItemId) return 1;
             return 0;
         });
-    }, [menuItems, activeCategory, bestsellerItemId]);
+    }, [menuItems, activeCategory, bestsellerItemId, searchTerm]);
 
     if (!valid) {
         return (
@@ -184,16 +195,57 @@ export default function MenuPage() {
             {/* Active Orders from Session */}
             < ActiveOrders session={session} sessionOrders={sessionOrders} />
 
-            {/* Category Tabs */}
-            {
-                categories.length > 1 && (
-                    <CategoryTabs
-                        categories={categories}
-                        activeCategory={activeCategory}
-                        onSelect={setActiveCategory}
-                    />
-                )
-            }
+            {/* Category Tabs & Search */}
+            <div className="category-search-container">
+                {isSearching ? (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--clr-surface-2)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--clr-border)' }}>
+                        <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center', color: 'var(--clr-text-muted)' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </span>
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search items..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--clr-text)', outline: 'none', fontSize: '14px' }}
+                        />
+                        <button
+                            onClick={() => { setIsSearching(false); setSearchTerm(''); }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--clr-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" fill="currentColor" />
+                                <path d="M15 9L9 15M9 9L15 15" stroke="var(--clr-surface-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                            {categories.length > 1 && (
+                                <CategoryTabs
+                                    categories={categories}
+                                    activeCategory={activeCategory}
+                                    onSelect={setActiveCategory}
+                                />
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setIsSearching(true)}
+                            style={{ background: 'transparent', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, color: 'var(--clr-text)' }}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </button>
+                    </>
+                )}
+            </div>
 
             {/* Menu Items Grid */}
             <div className="menu-grid">

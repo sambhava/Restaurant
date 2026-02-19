@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { encodeOrderToken } from '../utils/tokenUtils';
 import {
+
     collection,
     getDocs,
     doc,
@@ -10,6 +11,7 @@ import {
     query,
     where,
     getDoc,
+    onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import useAuthStore from '../store/authStore';
@@ -24,10 +26,13 @@ export default function TablesPage() {
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    const customerAppUrl = window.location.origin.replace('5174', '5173');
+
+
+    // Construct URL for customer app (assuming it runs on port 5173)
+    // Using hostname ensures it works on localhost AND network IP (for mobile scanning)
+    const customerAppUrl = `${window.location.protocol}//${window.location.hostname}:5173`;
 
     useEffect(() => {
-        fetchSessions();
         // Load saved table count from Firestore
         const loadTableCount = async () => {
             try {
@@ -42,7 +47,25 @@ export default function TablesPage() {
             }
         };
         loadTableCount();
-    }, []);
+
+        // Real-time listener for sessions
+        if (!restaurantId) return;
+        const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
+        const q = query(sessionsRef, where('status', '==', 'active'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const sessionMap = {};
+            snapshot.docs.forEach((d) => {
+                const data = d.data();
+                sessionMap[data.tableNumber] = { id: d.id, ...data };
+            });
+            setSessions(sessionMap);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error listening to sessions:", error);
+        });
+
+        return () => unsubscribe();
+    }, [restaurantId]);
 
     const handleTableCountChange = async (value) => {
         const count = parseInt(value) || 1;
@@ -64,23 +87,7 @@ export default function TablesPage() {
         }
     }, [selectedTable, sessions]);
 
-    const fetchSessions = async () => {
-        try {
-            const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
-            const q = query(sessionsRef, where('status', '==', 'active'));
-            const snapshot = await getDocs(q);
-            const sessionMap = {};
-            snapshot.docs.forEach((d) => {
-                const data = d.data();
-                sessionMap[data.tableNumber] = { id: d.id, ...data };
-            });
-            setSessions(sessionMap);
-        } catch (err) {
-            console.error('Error fetching sessions:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+
 
     const fetchTableOrders = async (session) => {
         if (!session.orderIds || session.orderIds.length === 0) {
@@ -131,10 +138,61 @@ export default function TablesPage() {
                 await Promise.all(updatePromises);
             }
 
-            fetchSessions();
+
             setSelectedTable(null);
         } catch (err) {
             console.error('Error closing session:', err);
+        }
+    };
+
+
+
+    const handleDeleteItem = async (order, itemIndex) => {
+        const session = sessions[selectedTable];
+        if (!session || !confirm('Delete this item?')) return;
+
+        const itemToRemove = order.items[itemIndex];
+        const newItems = order.items.filter((_, i) => i !== itemIndex);
+
+        // Calculate deltas
+        const deltaSubtotal = itemToRemove.subtotal;
+        const deltaTax = deltaSubtotal * 0.05;
+        const deltaTotal = deltaSubtotal + deltaTax;
+
+        try {
+            const orderRef = doc(db, 'restaurants', restaurantId, 'orders', order.id);
+            const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', session.id);
+
+            // Update Order
+            const newOrderSubtotal = (order.subtotal || 0) - deltaSubtotal;
+            const newOrderTax = (order.tax || 0) - deltaTax;
+            const newOrderTotal = (order.total || 0) - deltaTotal;
+
+            if (newItems.length === 0) {
+                await updateDoc(orderRef, {
+                    items: [],
+                    status: 'cancelled',
+                    subtotal: 0, tax: 0, total: 0
+                });
+            } else {
+                await updateDoc(orderRef, {
+                    items: newItems,
+                    subtotal: newOrderSubtotal,
+                    tax: newOrderTax,
+                    total: newOrderTotal
+                });
+            }
+
+            // Update Session
+            await updateDoc(sessionRef, {
+                total: (session.total || 0) - deltaTotal,
+                subtotal: (session.subtotal || 0) - deltaSubtotal,
+                tax: (session.tax || 0) - deltaTax
+            });
+
+
+        } catch (err) {
+            console.error("Error deleting item:", err);
         }
     };
 
@@ -317,7 +375,17 @@ export default function TablesPage() {
                         <div className="bill-section">
                             {currentSession ? (
                                 <>
-                                    <h3 className="bill-title">📋 Bill Details</h3>
+                                    <div className="bill-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                        <h3 className="bill-title" style={{ margin: 0 }}>📋 Bill Details</h3>
+                                        <button
+                                            className="add-item-btn"
+                                            onClick={() => window.open(getQrUrl(selectedTable), '_blank')}
+                                            style={{ padding: '6px 12px', fontSize: '13px', background: '#333', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                            title="Open Customer Menu to Add Items"
+                                        >
+                                            ➕ Add Item
+                                        </button>
+                                    </div>
 
                                     {ordersLoading ? (
                                         <div className="bill-loading">Loading orders...</div>
@@ -339,10 +407,19 @@ export default function TablesPage() {
                                                     </div>
                                                     <div className="bill-items">
                                                         {order.items?.map((item, i) => (
-                                                            <div key={i} className="bill-item-row">
+                                                            <div key={i} className="bill-item-row" style={{ display: 'flex', alignItems: 'center' }}>
                                                                 <span className="bill-item-qty">{item.quantity}×</span>
-                                                                <span className="bill-item-name">{item.name}</span>
+                                                                <span className="bill-item-name" style={{ flex: 1 }}>{item.name}</span>
                                                                 <span className="bill-item-price">₹{item.subtotal}</span>
+                                                                {!['ready', 'served', 'completed'].includes(order.status) && (
+                                                                    <button
+                                                                        onClick={() => handleDeleteItem(order, i)}
+                                                                        style={{ marginLeft: '8px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
+                                                                        title="Remove item"
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>

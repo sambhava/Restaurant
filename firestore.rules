@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Staff are authenticated with non-anonymous providers (e.g. password, google)
+    function isStaff() {
+      return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Customers are anonymous users (or authenticated users accessing their own data)
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /restaurants/{restaurantId} {
+      // Menu and Restaurant info is public
+      allow read: if true;
+      // Only staff can update restaurant details
+      allow write: if isStaff();
+
+      match /menuItems/{itemId} {
+        allow read: if true;
+        allow write: if isStaff();
+      }
+      
+      match /sessions/{sessionId} {
+        // Customers create sessions
+        // We allow create if authenticated (anonymous included)
+        allow create: if isAuthenticated();
+        // Update allowed if it's their own session OR staff (e.g. updating status/total)
+        allow update: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
+        // Read allowed if owner or staff
+        allow read: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
+      }
+
+      match /orders/{orderId} {
+        // Customers create orders
+        allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+        
+        // Customers generally don't update orders after placement, only staff (status)
+        // But if we allowed editing, it would be here.
+        allow update: if isStaff();
+        
+        // Read allowed if owner or staff
+        allow read: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
+      }
+    }
+  }
+}

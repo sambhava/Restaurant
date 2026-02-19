@@ -57,7 +57,6 @@ export default function OrdersPage() {
     const statusCounts = {
         all: orders.length,
         pending: orders.filter((o) => o.status === 'pending').length,
-        preparing: orders.filter((o) => o.status === 'preparing').length,
         ready: orders.filter((o) => o.status === 'ready').length,
         served: orders.filter((o) => o.status === 'served').length,
     };

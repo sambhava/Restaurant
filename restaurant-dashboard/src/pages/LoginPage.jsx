@@ -5,7 +5,6 @@ import useAuthStore from '../store/authStore';
 export default function LoginPage() {
     // Steps: 'credentials' → 'otp'
     const [step, setStep] = useState('credentials');
-    const [restaurantName, setRestaurantName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -37,7 +36,7 @@ export default function LoginPage() {
         e.preventDefault();
         clearError();
         try {
-            await login(email, password, restaurantName);
+            await login(email, password);
             // Credentials valid → move to OTP step
             const code = generateOtp();
             // In production, send this OTP via email/SMS using Firebase Functions
@@ -99,6 +98,14 @@ export default function LoginPage() {
 
     const isOtpComplete = otp.every((d) => d !== '');
 
+    const formatError = (err) => {
+        if (!err) return '';
+        if (err.includes('auth/invalid-credential') || err.includes('auth/user-not-found') || err.includes('auth/wrong-password')) {
+            return "Invalid credentials. Try again";
+        }
+        return err.replace('Firebase: Error (auth/', '').replace(').', '').replace('-', ' ');
+    };
+
     return (
         <div className="login-page">
             <div className="login-card">
@@ -123,19 +130,9 @@ export default function LoginPage() {
                 {/* Step 1: Credentials */}
                 {step === 'credentials' && (
                     <form onSubmit={handleCredentialsSubmit} className="login-form">
-                        {error && <div className="login-error">{error}</div>}
+                        {error && <div className="login-error">{formatError(error)}</div>}
 
-                        <div className="form-group">
-                            <label htmlFor="restaurantName">Restaurant Name</label>
-                            <input
-                                id="restaurantName"
-                                type="text"
-                                value={restaurantName}
-                                onChange={(e) => setRestaurantName(e.target.value)}
-                                placeholder="My Restaurant"
-                                required
-                            />
-                        </div>
+
 
                         <div className="form-group">
                             <label htmlFor="email">Email</label>

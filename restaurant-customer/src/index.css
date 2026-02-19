@@ -314,12 +314,19 @@ button {
 
 /* --- Category Tabs --- */
 .category-tabs-wrapper {
+  width: 100%;
+}
+
+.category-search-container {
   position: sticky;
   top: 73px;
   z-index: 15;
   background: var(--clr-bg);
-  padding: 12px 0;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--clr-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .category-tabs {

@@ -9,7 +9,7 @@ import {
     getDocs,
     serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 
 const SESSION_KEY = 'restaurant_session';
 
@@ -60,6 +60,7 @@ export async function getOrCreateSession(restaurantId, tableNumber) {
     // No active session found — create a new one
     const sessionData = {
         tableNumber,
+        userId: auth.currentUser?.uid || null,
         orderIds: [],
         status: 'active',
         subtotal: 0,

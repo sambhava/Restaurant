@@ -1,5 +1,5 @@
 export default function OrderCard({ order, onStatusUpdate }) {
-    const statusFlow = ['pending', 'preparing', 'ready', 'served'];
+    const statusFlow = ['pending', 'ready', 'served'];
     const currentIdx = statusFlow.indexOf(order.status);
     const nextStatus = currentIdx < statusFlow.length - 1 ? statusFlow[currentIdx + 1] : null;
 

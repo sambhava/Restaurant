@@ -5,7 +5,7 @@ import {
     getDoc,
     serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { getOrCreateSession, addOrderToSession } from './sessionService';
 
 /**
@@ -32,6 +32,7 @@ export async function submitOrder(
     const orderData = {
         tableNumber,
         sessionId: session.id,
+        userId: auth.currentUser?.uid || null,
         items: cartItems.map((item) => ({
             itemId: item.id,
             name: item.name,
