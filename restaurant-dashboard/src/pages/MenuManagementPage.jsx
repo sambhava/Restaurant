@@ -178,14 +178,6 @@ export default function MenuManagementPage() {
                                     />
                                     <span>Vegetarian</span>
                                 </label>
-                                <label className="toggle-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.isAvailable}
-                                        onChange={(e) => setForm({ ...form, isAvailable: e.target.checked })}
-                                    />
-                                    <span>Available</span>
-                                </label>
                             </div>
                             <div className="form-actions">
                                 <button type="button" className="cancel-btn" onClick={resetForm}>Cancel</button>

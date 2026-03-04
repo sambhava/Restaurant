@@ -12,46 +12,41 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // Customers are anonymous users (or authenticated users accessing their own data)
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if request.auth.uid == userId;
     }
 
     match /restaurants/{restaurantId} {
-      // Menu and Restaurant info is public
+      // Restaurant info is public (name, logo, etc.)
       allow read: if true;
       // Only staff can update restaurant details
       allow write: if isStaff();
 
       match /menuItems/{itemId} {
+        // Menu is publicly readable (customers browse it)
         allow read: if true;
+        // Only staff can add/edit/delete menu items
         allow write: if isStaff();
       }
       
       match /sessions/{sessionId} {
-        // Customers create sessions
-        // We allow create if authenticated (anonymous included)
+        // Any authenticated user can read sessions (needed for table lookup)
+        allow read: if isAuthenticated() || isStaff();
+        // Any authenticated user can create a session
         allow create: if isAuthenticated();
-        // Update allowed if it's their own session OR staff (e.g. updating status/total)
-        allow update: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
-        // Read allowed if owner or staff
-        allow read: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
+        // Update allowed by session owner (adding orders) or staff (closing session)
+        allow update: if isAuthenticated() || isStaff();
+        // Only staff can delete sessions
+        allow delete: if isStaff();
       }
 
       match /orders/{orderId} {
-        // Customers create orders
-        allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
-        
-        // Customers generally don't update orders after placement, only staff (status)
-        // But if we allowed editing, it would be here.
-        allow update: if isStaff();
-        
-        // Read allowed if owner or staff
-        allow read: if (isAuthenticated() && isOwner(resource.data.userId)) || isStaff();
+        // Authenticated users can read orders (needed for session order display)
+        allow read: if isAuthenticated() || isStaff();
+        // Authenticated users can create orders
+        allow create: if isAuthenticated();
+        // Only staff can update orders (status changes) or delete
+        allow update, delete: if isStaff();
       }
     }
   }

@@ -20,7 +20,7 @@ export default function MenuPage() {
     const { session, sessionOrders, refreshSession } = useSession(restaurantId, tableNumber);
     const [activeCategory, setActiveCategory] = useState('all');
     const [restaurantInfo, setRestaurantInfo] = useState(null);
-    const [bestsellerItemId, setBestsellerItemId] = useState(null);
+    const [bestsellerItemIds, setBestsellerItemIds] = useState([]);
     const [showSplash, setShowSplash] = useState(() => {
         if (sessionStorage.getItem('splashShown')) return false;
         sessionStorage.setItem('splashShown', '1');
@@ -46,10 +46,10 @@ export default function MenuPage() {
         fetchInfo();
     }, [restaurantId]);
 
-    // Find the bestseller item by counting order frequency
+    // Find the top 5 bestseller items by counting order frequency
     useEffect(() => {
         if (!restaurantId) return;
-        async function findBestseller() {
+        async function findBestsellers() {
             try {
                 const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
                 const snapshot = await getDocs(query(ordersRef));
@@ -63,28 +63,24 @@ export default function MenuPage() {
                         });
                     }
                 });
-                // Find the item with the highest count
-                let maxId = null;
-                let maxCount = 0;
-                for (const [id, count] of Object.entries(itemCounts)) {
-                    // Skip if the item is a Bread
-                    const item = menuItems.find((i) => i.id === id);
-                    if (item) {
+                // Filter out breads, then pick top 5 by order count
+                const sorted = Object.entries(itemCounts)
+                    .filter(([id]) => {
+                        const item = menuItems.find((i) => i.id === id);
+                        if (!item) return false;
                         const cat = (item.category || '').toLowerCase().trim();
-                        if (cat === 'breads' || cat === 'bread') continue;
-                    }
-
-                    if (count > maxCount) {
-                        maxCount = count;
-                        maxId = id;
-                    }
-                }
-                if (maxCount >= 2) setBestsellerItemId(maxId);
+                        return cat !== 'breads' && cat !== 'bread';
+                    })
+                    .filter(([, count]) => count >= 2)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([id]) => id);
+                setBestsellerItemIds(sorted);
             } catch (err) {
-                console.error('Error finding bestseller:', err);
+                console.error('Error finding bestsellers:', err);
             }
         }
-        if (menuItems.length > 0) findBestseller();
+        if (menuItems.length > 0) findBestsellers();
     }, [restaurantId, menuItems]);
 
     // Refresh session when page gets focus (coming back from confirmation)
@@ -106,16 +102,20 @@ export default function MenuPage() {
             base = base.filter((item) => item.category === activeCategory);
         }
 
-        if (!bestsellerItemId) return base;
+        if (bestsellerItemIds.length === 0) return base;
 
-        // Put bestseller first (only if not searching, or keep it?)
-        // Let's keep bestseller logic even in search if it matches
+        // Put bestsellers first, preserving their relative order
         return [...base].sort((a, b) => {
-            if (a.id === bestsellerItemId) return -1;
-            if (b.id === bestsellerItemId) return 1;
+            const aIdx = bestsellerItemIds.indexOf(a.id);
+            const bIdx = bestsellerItemIds.indexOf(b.id);
+            const aIsBs = aIdx !== -1;
+            const bIsBs = bIdx !== -1;
+            if (aIsBs && !bIsBs) return -1;
+            if (!aIsBs && bIsBs) return 1;
+            if (aIsBs && bIsBs) return aIdx - bIdx;
             return 0;
         });
-    }, [menuItems, activeCategory, bestsellerItemId, searchTerm]);
+    }, [menuItems, activeCategory, bestsellerItemIds, searchTerm]);
 
     if (!valid) {
         return (
@@ -258,7 +258,7 @@ export default function MenuPage() {
                         <MenuItem
                             key={item.id}
                             item={item}
-                            isBestseller={item.id === bestsellerItemId}
+                            isBestseller={bestsellerItemIds.includes(item.id)}
                         />
                     ))
                 )}
