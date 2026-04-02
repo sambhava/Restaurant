@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     collection,
     query,
-    where,
     onSnapshot,
     doc,
     updateDoc,
@@ -12,11 +11,45 @@ import { db } from '../firebase/config';
 import OrderCard from '../components/OrderCard';
 import useAuthStore from '../store/authStore';
 
+// Generate a notification sound using Web Audio API
+function playNotificationSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, ctx.currentTime); // A5
+        oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1); // C#6
+        oscillator.frequency.setValueAtTime(1320, ctx.currentTime + 0.2); // E6
+
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+        // Audio not supported — fail silently
+    }
+}
+
 export default function OrdersPage() {
     const restaurantId = useAuthStore((s) => s.restaurantId);
     const [orders, setOrders] = useState([]);
     const [filter, setFilter] = useState('all');
     const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState(null);
+    const prevOrderCountRef = useRef(null);
+    const toastTimerRef = useRef(null);
+
+    const showToast = useCallback((message) => {
+        setToast(message);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+    }, []);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -30,12 +63,25 @@ export default function OrdersPage() {
                     ...doc.data(),
                 }))
                 .filter((order) => order.status !== 'closed');
+
+            // Detect new orders (only after initial load)
+            if (prevOrderCountRef.current !== null) {
+                const newCount = orderData.filter(o => o.status === 'pending').length;
+                const prevCount = prevOrderCountRef.current;
+                if (newCount > prevCount) {
+                    const diff = newCount - prevCount;
+                    playNotificationSound();
+                    showToast(`🔔 ${diff} new order${diff > 1 ? 's' : ''} received!`);
+                }
+            }
+            prevOrderCountRef.current = orderData.filter(o => o.status === 'pending').length;
+
             setOrders(orderData);
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [restaurantId]);
+    }, [restaurantId, showToast]);
 
     const handleStatusUpdate = async (orderId, newStatus) => {
         try {
@@ -72,6 +118,13 @@ export default function OrdersPage() {
 
     return (
         <div className="orders-page">
+            {/* Toast Notification */}
+            {toast && (
+                <div className="order-toast">
+                    {toast}
+                </div>
+            )}
+
             <div className="page-header">
                 <h1>Live Orders</h1>
                 <span className="live-badge">● LIVE</span>

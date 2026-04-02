@@ -9,6 +9,7 @@ import CategoryTabs from '../components/CategoryTabs';
 import CartButton from '../components/CartButton';
 import ActiveOrders from '../components/ActiveOrders';
 import ThemeToggle from '../components/ThemeToggle';
+import SkeletonCard from '../components/SkeletonCard';
 import { getRestaurantInfo } from '../services/orderService';
 import { getOrderParams } from '../utils/urlParser';
 
@@ -132,9 +133,12 @@ export default function MenuPage() {
 
     if (loading) {
         return (
-            <div className="page-loader">
-                <div className="loader-spinner"></div>
-                <p>Loading menu...</p>
+            <div className="menu-page">
+                <div className="menu-items-grid">
+                    {[...Array(6)].map((_, i) => (
+                        <SkeletonCard key={i} />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -175,9 +179,9 @@ export default function MenuPage() {
             {/* Header */}
             <header className="menu-header">
                 <div className="menu-header-content">
-                    {restaurantInfo?.branding?.logo && (
+                    {(restaurantInfo?.logoUrl || restaurantInfo?.logo || restaurantInfo?.branding?.logo) && (
                         <img
-                            src={restaurantInfo.branding.logo}
+                            src={restaurantInfo.logoUrl || restaurantInfo.logo || restaurantInfo.branding.logo}
                             alt="logo"
                             className="restaurant-logo"
                         />
@@ -192,13 +196,24 @@ export default function MenuPage() {
                 <ThemeToggle restaurantId={restaurantId} tableNumber={tableNumber} />
             </header>
 
+            {/* Hero Welcome Section */}
+            <div className="menu-hero">
+                <h2 className="menu-hero-title">
+                    We serve the <span>taste</span><br />
+                    you love
+                </h2>
+                <p className="menu-hero-subtitle">
+                    Browse our menu and order your favorites directly to your table.
+                </p>
+            </div>
+
             {/* Active Orders from Session */}
-            < ActiveOrders session={session} sessionOrders={sessionOrders} />
+            <ActiveOrders session={session} sessionOrders={sessionOrders} />
 
             {/* Category Tabs & Search */}
             <div className="category-search-container">
                 {isSearching ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--clr-surface-2)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--clr-border)' }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--clr-surface)', padding: '6px 12px', borderRadius: '100px', border: '1.5px solid var(--clr-border)' }}>
                         <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center', color: 'var(--clr-text-muted)' }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="11" cy="11" r="8"></circle>
@@ -208,7 +223,7 @@ export default function MenuPage() {
                         <input
                             autoFocus
                             type="text"
-                            placeholder="Search items..."
+                            placeholder="Search dishes..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--clr-text)', outline: 'none', fontSize: '14px' }}
@@ -219,7 +234,7 @@ export default function MenuPage() {
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                <path d="M15 9L9 15M9 9L15 15" stroke="var(--clr-surface-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M15 9L9 15M9 9L15 15" stroke="var(--clr-surface)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
                     </div>
@@ -236,9 +251,9 @@ export default function MenuPage() {
                         </div>
                         <button
                             onClick={() => setIsSearching(true)}
-                            style={{ background: 'transparent', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, color: 'var(--clr-text)' }}
+                            style={{ background: 'var(--clr-accent-light)', border: '1.5px solid var(--clr-border)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, color: 'var(--clr-accent)', transition: 'all 0.2s' }}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
@@ -248,24 +263,25 @@ export default function MenuPage() {
             </div>
 
             {/* Menu Items Grid */}
-            <div className="menu-grid">
+            <div className="menu-grid menu-grid-animated" key={activeCategory}>
                 {filteredItems.length === 0 ? (
                     <div className="empty-state">
                         <p>No items in this category</p>
                     </div>
                 ) : (
-                    filteredItems.map((item) => (
-                        <MenuItem
-                            key={item.id}
-                            item={item}
-                            isBestseller={bestsellerItemIds.includes(item.id)}
-                        />
+                    filteredItems.map((item, index) => (
+                        <div key={item.id} className="menu-item-animate" style={{ animationDelay: `${index * 0.04}s` }}>
+                            <MenuItem
+                                item={item}
+                                isBestseller={bestsellerItemIds.includes(item.id)}
+                            />
+                        </div>
                     ))
                 )}
             </div>
 
             {/* Floating Cart Button */}
             <CartButton />
-        </div >
+        </div>
     );
 }

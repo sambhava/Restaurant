@@ -10,32 +10,45 @@ const useCartStore = create((set, get) => ({
 
     setSpecialInstructions: (text) => set({ specialInstructions: text }),
 
+    // Generate a unique cart key from item id + variant + addons
+    _cartKey: (item) => {
+        let key = item.id;
+        if (item.selectedVariant) {
+            key += `__${item.selectedVariant}`;
+        }
+        if (item.selectedAddOns && item.selectedAddOns.length > 0) {
+            key += `__${item.selectedAddOns.sort().join('_')}`;
+        }
+        return key;
+    },
+
     addItem: (item) =>
         set((state) => {
-            const existing = state.items.find((i) => i.id === item.id);
+            const cartKey = get()._cartKey(item);
+            const existing = state.items.find((i) => i.cartKey === cartKey);
             if (existing) {
                 return {
                     items: state.items.map((i) =>
-                        i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                        i.cartKey === cartKey ? { ...i, quantity: i.quantity + 1 } : i
                     ),
                 };
             }
-            return { items: [...state.items, { ...item, quantity: 1 }] };
+            return { items: [...state.items, { ...item, cartKey, quantity: 1 }] };
         }),
 
-    removeItem: (itemId) =>
+    removeItem: (cartKey) =>
         set((state) => ({
-            items: state.items.filter((i) => i.id !== itemId),
+            items: state.items.filter((i) => i.cartKey !== cartKey),
         })),
 
-    updateQuantity: (itemId, quantity) =>
+    updateQuantity: (cartKey, quantity) =>
         set((state) => {
             if (quantity <= 0) {
-                return { items: state.items.filter((i) => i.id !== itemId) };
+                return { items: state.items.filter((i) => i.cartKey !== cartKey) };
             }
             return {
                 items: state.items.map((i) =>
-                    i.id === itemId ? { ...i, quantity } : i
+                    i.cartKey === cartKey ? { ...i, quantity } : i
                 ),
             };
         }),

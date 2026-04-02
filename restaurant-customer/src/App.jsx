@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase/config';
+import ErrorBoundary from './components/ErrorBoundary';
+import OfflineBanner from './components/OfflineBanner';
 import MenuPage from './pages/MenuPage';
 import CartPage from './pages/CartPage';
 import OrderConfirmation from './pages/OrderConfirmation';
@@ -33,14 +35,17 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/order" element={<MenuPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/confirm" element={<OrderConfirmation />} />
-        <Route path="*" element={<Navigate to="/order" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <OfflineBanner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/order" element={<MenuPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/confirm" element={<OrderConfirmation />} />
+          <Route path="*" element={<Navigate to="/order" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

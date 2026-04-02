@@ -66,6 +66,18 @@ export default function OrderCard({ order, onStatusUpdate }) {
                 </div>
             )}
 
+            {/* Progress Bar */}
+            <div className="order-progress">
+                {statusFlow.map((step, i) => (
+                    <div
+                        key={step}
+                        className={`order-progress-step ${i < currentIdx ? 'completed' :
+                                i === currentIdx ? 'active' : ''
+                            }`}
+                    />
+                ))}
+            </div>
+
             {/* Footer */}
             <div className="order-card-footer">
                 <div className="order-meta">

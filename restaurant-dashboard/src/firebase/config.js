@@ -4,13 +4,23 @@ import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDrw8ZzIlWpYdsfZUXvfE7lQTyLRJtxX2Q",
-    authDomain: "restaurant-qr-dev.firebaseapp.com",
-    projectId: "restaurant-qr-dev",
-    storageBucket: "restaurant-qr-dev.firebasestorage.app",
-    messagingSenderId: "636693279490",
-    appId: "1:636693279490:web:b49b159531e40cd98dc81b",
-    measurementId: "G-SRE5SSG6GV"
+<<<<<<< HEAD
+    apiKey: "XYZ",
+    authDomain: "XYZ",
+    projectId: "XYZ",
+    storageBucket: "XYZ",
+    messagingSenderId: "XYZ",
+    appId: "XYZ",
+    measurementId: "XYZ"
+=======
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+>>>>>>> 45e5825 (Feat: Complete Menu Seeding, Bezier Chart Coordinate Snapping, Poppins Font Overhaul, Modern Slate Theme, Custom Sidebar Icons, & Logo Support)
 };
 
 const app = initializeApp(firebaseConfig);

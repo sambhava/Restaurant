@@ -117,7 +117,7 @@ export default function TablesPage() {
         if (!session) return;
         if (!confirm(`Close the bill for Table ${tableNum}? Total: ₹${session.total?.toFixed(0)}`)) return;
 
-        // Print bill before closing (uses current tableOrders state)
+        // Print bill automatically before closing
         printBill(tableNum);
 
         try {
@@ -138,14 +138,11 @@ export default function TablesPage() {
                 await Promise.all(updatePromises);
             }
 
-
             setSelectedTable(null);
         } catch (err) {
             console.error('Error closing session:', err);
         }
     };
-
-
 
     const handleDeleteItem = async (order, itemIndex) => {
         const session = sessions[selectedTable];
@@ -190,7 +187,6 @@ export default function TablesPage() {
                 tax: (session.tax || 0) - deltaTax
             });
 
-
         } catch (err) {
             console.error("Error deleting item:", err);
         }
@@ -203,7 +199,10 @@ export default function TablesPage() {
 
     const printBill = (tableNum) => {
         const session = sessions[tableNum];
-        if (!session || tableOrders.length === 0) return;
+        if (!session || tableOrders.length === 0) {
+            alert("No orders to print!");
+            return;
+        }
 
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -213,7 +212,7 @@ export default function TablesPage() {
         const allItems = [];
         tableOrders.forEach((order) => {
             order.items?.forEach((item) => {
-                const existing = allItems.find((i) => i.name === item.name && i.price === item.price);
+                const existing = allItems.find((i) => i.name === item.name && i.price === item.price && i.selectedVariant === item.selectedVariant);
                 if (existing) {
                     existing.quantity += item.quantity;
                     existing.subtotal += item.subtotal;
@@ -225,7 +224,10 @@ export default function TablesPage() {
 
         const itemRows = allItems.map((item) => `
             <tr>
-                <td style="padding:6px 0;border-bottom:1px dashed #ddd;">${item.name}</td>
+                <td style="padding:6px 0;border-bottom:1px dashed #ddd;">
+                    ${item.name}
+                    ${item.selectedVariant ? `<br><small style="color:#666;">(${item.selectedVariant})</small>` : ''}
+                </td>
                 <td style="padding:6px 8px;border-bottom:1px dashed #ddd;text-align:center;">${item.quantity}</td>
                 <td style="padding:6px 0;border-bottom:1px dashed #ddd;text-align:right;">₹${item.subtotal?.toFixed(2)}</td>
             </tr>
@@ -299,10 +301,24 @@ export default function TablesPage() {
         </html>
         `;
 
-        const w = window.open('', '_blank');
-        w.document.write(billHTML);
-        w.document.write('<script>window.onload = function() { window.print(); window.close(); }</script>');
-        w.document.close();
+        // Use iframe printing to bypass popup blockers entirely
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        iframe.contentDocument.write(billHTML);
+        iframe.contentDocument.close();
+
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 2000);
+        };
     };
 
     const formatTime = (timestamp) => {
@@ -364,9 +380,18 @@ export default function TablesPage() {
                     <div className="table-detail-header">
                         <h2>Table {selectedTable}</h2>
                         {currentSession && (
-                            <button className="close-bill-btn" onClick={() => closeSession(selectedTable)}>
-                                Close Bill — ₹{currentSession.total?.toFixed(0)}
-                            </button>
+                            <div className="table-actions" style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    className="print-bill-btn"
+                                    onClick={() => printBill(selectedTable)}
+                                    style={{ padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                                >
+                                    🖨️ Print Bill
+                                </button>
+                                <button className="close-bill-btn" onClick={() => closeSession(selectedTable)}>
+                                    Close Bill — ₹{currentSession.total?.toFixed(0)}
+                                </button>
+                            </div>
                         )}
                     </div>
 

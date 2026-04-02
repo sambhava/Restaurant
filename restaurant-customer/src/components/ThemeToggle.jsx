@@ -5,8 +5,8 @@ export default function ThemeToggle({ restaurantId, tableNumber }) {
 
     const [dark, setDark] = useState(() => {
         const saved = localStorage.getItem(storageKey);
-        // Default to dark if nothing saved
-        return saved ? saved === 'dark' : true;
+        // Default to light (warm cream) if nothing saved
+        return saved ? saved === 'dark' : false;
     });
 
     useEffect(() => {
