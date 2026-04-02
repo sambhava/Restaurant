@@ -4,13 +4,13 @@ import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDrw8ZzIlWpYdsfZUXvfE7lQTyLRJtxX2Q",
-    authDomain: "restaurant-qr-dev.firebaseapp.com",
-    projectId: "restaurant-qr-dev",
-    storageBucket: "restaurant-qr-dev.firebasestorage.app",
-    messagingSenderId: "636693279490",
-    appId: "1:636693279490:web:b49b159531e40cd98dc81b",
-    measurementId: "G-SRE5SSG6GV"
+    apiKey: "xyz",
+    authDomain: "xyz",
+    projectId: "xyz",
+    storageBucket: "xyz",
+    messagingSenderId: "xyz",
+    appId: "xyz",
+    measurementId: "xyz"
 };
 
 const app = initializeApp(firebaseConfig);
