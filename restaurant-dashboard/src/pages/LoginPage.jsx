@@ -169,7 +169,7 @@ export default function LoginPage() {
 
                         <div className="form-group">
                             <label htmlFor="password">Password</label>
-                            <div className="password-input-wrapper" style={{ position: 'relative' }}>
+                            <div className="password-input-wrapper" style={{ position: 'relative', width: '100%' }}>
                                 <input
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
@@ -177,7 +177,7 @@ export default function LoginPage() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Enter your password"
                                     required
-                                    style={{ paddingRight: '40px' }}
+                                    style={{ width: '100%', paddingRight: '40px' }}
                                 />
                                 <button
                                     type="button"
