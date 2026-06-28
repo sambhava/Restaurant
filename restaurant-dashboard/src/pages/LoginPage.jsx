@@ -11,6 +11,7 @@ export default function LoginPage() {
     const [generatedOtp, setGeneratedOtp] = useState('');
     const [otpError, setOtpError] = useState('');
     const [resendTimer, setResendTimer] = useState(0);
+    const [showPassword, setShowPassword] = useState(false);
 
     const { login, loading, error, clearError } = useAuthStore();
     const navigate = useNavigate();
@@ -168,14 +169,39 @@ export default function LoginPage() {
 
                         <div className="form-group">
                             <label htmlFor="password">Password</label>
-                            <input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter your password"
-                                required
-                            />
+                            <div className="password-input-wrapper" style={{ position: 'relative' }}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Enter your password"
+                                    required
+                                    style={{ paddingRight: '40px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: '16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '4px',
+                                        userSelect: 'none'
+                                    }}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? '🙈' : '👁️'}
+                                </button>
+                            </div>
                         </div>
 
                         <button type="submit" className="login-btn" disabled={loading}>
