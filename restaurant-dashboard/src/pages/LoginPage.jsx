@@ -32,6 +32,28 @@ export default function LoginPage() {
         return code;
     };
 
+    const sendOtpEmail = async (targetEmail, otpCode) => {
+        // If we are in production on Cloudflare, dispatch the OTP email
+        if (import.meta.env.PROD) {
+            try {
+                const response = await fetch('/api/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: targetEmail, code: otpCode }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    console.error("Error sending OTP email:", data.error);
+                }
+            } catch (err) {
+                console.error("Failed to fetch OTP edge endpoint:", err);
+            }
+        } else {
+            // In local development, show the popup alert so you can easily copy-paste
+            alert(`Your OTP is: ${otpCode}\n\n(In production, this would be sent to ${targetEmail})`);
+        }
+    };
+
     const handleCredentialsSubmit = async (e) => {
         e.preventDefault();
         clearError();
@@ -39,9 +61,7 @@ export default function LoginPage() {
             await login(email, password);
             // Credentials valid → move to OTP step
             const code = generateOtp();
-            // In production, send this OTP via email/SMS using Firebase Functions
-            // For now, it's logged to the console
-            alert(`Your OTP is: ${code}\n\n(In production, this would be sent to ${email})`);
+            await sendOtpEmail(email, code);
             setStep('otp');
         } catch {
             // Error handled by store
@@ -88,10 +108,10 @@ export default function LoginPage() {
         }
     };
 
-    const handleResend = () => {
+    const handleResend = async () => {
         if (resendTimer > 0) return;
         const code = generateOtp();
-        alert(`New OTP: ${code}\n\n(In production, this would be sent to ${email})`);
+        await sendOtpEmail(email, code);
         setOtp(['', '', '', '', '', '']);
         setOtpError('');
     };
