@@ -28,9 +28,26 @@ export default function TablesPage() {
 
 
 
-    // Construct URL for customer app (assuming it runs on port 5173)
-    // Using hostname ensures it works on localhost AND network IP (for mobile scanning)
-    const customerAppUrl = `${window.location.protocol}//${window.location.hostname}:5173`;
+    // Construct URL for customer app dynamically
+    const getCustomerAppUrl = () => {
+        if (import.meta.env.VITE_CUSTOMER_APP_URL) {
+            return import.meta.env.VITE_CUSTOMER_APP_URL;
+        }
+        const { protocol, hostname } = window.location;
+        // If on localhost, point to the Vite development port
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return `${protocol}//${hostname}:5173`;
+        }
+        // If on Cloudflare Pages, map dashboard subdomain to customer subdomain
+        if (hostname.includes('restaurant-dashboard')) {
+            const customerHostname = hostname.replace('restaurant-dashboard', 'restaurant-customer');
+            return `${protocol}//${customerHostname}`;
+        }
+        // Production fallback
+        return `${protocol}//${hostname}`;
+    };
+
+    const customerAppUrl = getCustomerAppUrl();
 
     useEffect(() => {
         // Load saved table count from Firestore
