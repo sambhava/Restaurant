@@ -39,15 +39,6 @@ const useAuthStore = create((set, get) => ({
                     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             const profile = docSnap.data();
-                            
-                            // Check if this session is still the active one
-                            const localSessionId = localStorage.getItem('activeSessionId');
-                            if (profile.activeSessionId && localSessionId && profile.activeSessionId !== localSessionId) {
-                                console.warn("Single session violation: another login detected. Logging out.");
-                                get().logout();
-                                alert("You have been logged out because this account was logged in from another device or window.");
-                                return;
-                            }
 
                             set({
                                 user,
@@ -90,10 +81,6 @@ const useAuthStore = create((set, get) => ({
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const uid = userCredential.user.uid;
 
-            // Generate unique active session ID
-            const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            localStorage.setItem('activeSessionId', sessionId);
-
             // Check if user already has a restaurantId
             let restaurantId = '';
             const existingProfile = await getDoc(doc(db, 'users', uid));
@@ -113,7 +100,7 @@ const useAuthStore = create((set, get) => ({
             // Immediately set user so dashboard can render
             set({
                 user: userCredential.user,
-                userProfile: { email, restaurantName, restaurantId, role: 'owner', activeSessionId: sessionId },
+                userProfile: { email, restaurantName, restaurantId, role: 'owner' },
                 restaurantId,
                 restaurantName: restaurantName || '',
                 loading: false,
@@ -130,7 +117,6 @@ const useAuthStore = create((set, get) => ({
                     restaurantName,
                     restaurantId,
                     role: 'owner',
-                    activeSessionId: sessionId,
                     lastLogin: new Date(),
                 }, { merge: true }),
                 // Create/update the restaurant document
@@ -154,7 +140,6 @@ const useAuthStore = create((set, get) => ({
             await signOut(auth);
             localStorage.removeItem('restaurantName');
             localStorage.removeItem('restaurantId');
-            localStorage.removeItem('activeSessionId');
             set({ restaurantName: '', restaurantId: '', unsubscribeProfile: null });
         } catch (err) {
             console.error('Logout error:', err);
