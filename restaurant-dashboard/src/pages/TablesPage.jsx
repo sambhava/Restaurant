@@ -19,6 +19,42 @@ import {
 import { db } from '../firebase/config';
 import useAuthStore from '../store/authStore';
 
+// FSSAI Standard Veg / Non-Veg Indicator Badge
+function VegBadge({ isVeg = true, size = 'md' }) {
+    const isSmall = size === 'sm';
+    const boxSize = isSmall ? '13px' : '15px';
+    const dotSize = isSmall ? '5px' : '6px';
+    const color = isVeg ? '#10B981' : '#EF4444';
+
+    return (
+        <span
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: boxSize,
+                height: boxSize,
+                border: `2px solid ${color}`,
+                borderRadius: '3px',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+                backgroundColor: 'transparent',
+            }}
+            title={isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+        >
+            <span
+                style={{
+                    width: dotSize,
+                    height: dotSize,
+                    borderRadius: '50%',
+                    backgroundColor: color,
+                    display: 'block',
+                }}
+            />
+        </span>
+    );
+}
+
 export default function TablesPage() {
     const restaurantId = useAuthStore((s) => s.restaurantId);
     const restaurantName = useAuthStore((s) => s.restaurantName);
@@ -34,10 +70,16 @@ export default function TablesPage() {
     const [menuItems, setMenuItems] = useState([]);
     const [menuLoading, setMenuLoading] = useState(false);
     const [menuSearch, setMenuSearch] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [addItemCart, setAddItemCart] = useState({});
     const [addingToBill, setAddingToBill] = useState(false);
 
+    // Custom confirm modal state (replacing native browser alerts)
+    const [confirmCloseTable, setConfirmCloseTable] = useState(null);
+    const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
+
     const customerAppUrl = getCustomerAppUrl();
+
 
 
 
@@ -121,10 +163,9 @@ export default function TablesPage() {
         }
     };
 
-    const closeSession = async (tableNum) => {
+    const executeCloseSession = async (tableNum) => {
         const session = sessions[tableNum];
         if (!session) return;
-        if (!confirm(`Close the bill for Table ${tableNum}? Total: ₹${session.total?.toFixed(0)}`)) return;
 
         // Print bill automatically before closing
         printBill(tableNum);
@@ -148,14 +189,15 @@ export default function TablesPage() {
             }
 
             setSelectedTable(null);
+            setConfirmCloseTable(null);
         } catch (err) {
             console.error('Error closing session:', err);
         }
     };
 
-    const handleDeleteItem = async (order, itemIndex) => {
+    const executeDeleteItem = async (order, itemIndex) => {
         const session = sessions[selectedTable];
-        if (!session || !confirm('Delete this item?')) return;
+        if (!session) return;
 
         const itemToRemove = order.items[itemIndex];
         const newItems = order.items.filter((_, i) => i !== itemIndex);
@@ -196,6 +238,7 @@ export default function TablesPage() {
                 tax: (session.tax || 0) - deltaTax
             });
 
+            setConfirmDeleteItem(null);
         } catch (err) {
             console.error("Error deleting item:", err);
         }
@@ -219,6 +262,7 @@ export default function TablesPage() {
         setShowAddItemModal(true);
         setAddItemCart({});
         setMenuSearch('');
+        setSelectedCategory('all');
         loadMenuItems();
     };
 
@@ -270,6 +314,7 @@ export default function TablesPage() {
                 quantity,
                 price,
                 subtotal: price * quantity,
+                isVeg: item.isVeg !== false,
                 addedBy: 'staff',
             }));
 
@@ -311,10 +356,16 @@ export default function TablesPage() {
         }
     };
 
-    const filteredMenuItems = menuItems.filter(item =>
-        item.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
-        item.category?.toLowerCase().includes(menuSearch.toLowerCase())
-    );
+    const categories = ['all', ...new Set(menuItems.map(i => i.category).filter(Boolean))];
+
+    const filteredMenuItems = menuItems.filter(item => {
+        const matchesSearch = item.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
+            item.category?.toLowerCase().includes(menuSearch.toLowerCase()) ||
+            item.description?.toLowerCase().includes(menuSearch.toLowerCase());
+        const matchesCategory = selectedCategory === 'all' || item.category?.toLowerCase() === selectedCategory.toLowerCase();
+        return matchesSearch && matchesCategory;
+    });
+
 
     const getQrUrl = (tableNum) => {
         const token = encodeOrderToken(restaurantId, tableNum);
@@ -513,7 +564,7 @@ export default function TablesPage() {
                                 >
                                     🖨️ Print Bill
                                 </button>
-                                <button className="close-bill-btn" onClick={() => closeSession(selectedTable)}>
+                                <button className="close-bill-btn" onClick={() => setConfirmCloseTable(selectedTable)}>
                                     Close Bill — ₹{currentSession.total?.toFixed(0)}
                                 </button>
                             </div>
@@ -530,7 +581,7 @@ export default function TablesPage() {
                                         <button
                                             className="add-item-btn"
                                             onClick={openAddItemModal}
-                                            style={{ padding: '6px 12px', fontSize: '13px', background: '#333', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                            style={{ padding: '6px 14px', fontSize: '13px', background: '#0F172A', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
                                             title="Add Items to Table Bill"
                                         >
                                             ➕ Add Item
@@ -557,13 +608,14 @@ export default function TablesPage() {
                                                     </div>
                                                     <div className="bill-items">
                                                         {order.items?.map((item, i) => (
-                                                            <div key={i} className="bill-item-row" style={{ display: 'flex', alignItems: 'center' }}>
+                                                            <div key={i} className="bill-item-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <VegBadge isVeg={item.isVeg !== false} size="sm" />
                                                                 <span className="bill-item-qty">{item.quantity}×</span>
                                                                 <span className="bill-item-name" style={{ flex: 1 }}>{item.name}</span>
                                                                 <span className="bill-item-price">₹{item.subtotal}</span>
                                                                 {!['ready', 'served', 'completed'].includes(order.status) && (
                                                                     <button
-                                                                        onClick={() => handleDeleteItem(order, i)}
+                                                                        onClick={() => setConfirmDeleteItem({ order, itemIndex: i, item })}
                                                                         style={{ marginLeft: '8px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '0 4px' }}
                                                                         title="Remove item"
                                                                     >
@@ -640,59 +692,159 @@ export default function TablesPage() {
                 </div>
             )}
 
-            {/* In-Dashboard Add Item Modal */}
+            {/* Premium In-Dashboard Add Item Modal */}
             {showAddItemModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-                    <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', overflow: 'hidden', color: '#333' }}>
-                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                    <div style={{ background: '#FFFFFF', borderRadius: '20px', width: '100%', maxWidth: '680px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)', overflow: 'hidden', border: '1px solid rgba(226, 232, 240, 0.8)' }}>
+                        {/* Modal Header */}
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC' }}>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111' }}>➕ Add Items — Table {selectedTable}</h3>
-                                <span style={{ fontSize: '12px', color: '#666' }}>Select items from your menu to add to this bill</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ background: '#FEF3C7', color: '#D97706', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>Table {selectedTable}</span>
+                                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>➕ Add Items to Order</h3>
+                                </div>
+                                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748B' }}>Pick items from your menu to add to Table {selectedTable}'s live bill</p>
                             </div>
-                            <button onClick={() => setShowAddItemModal(false)} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>✕</button>
+                            <button
+                                onClick={() => setShowAddItemModal(false)}
+                                style={{ background: '#F1F5F9', border: 'none', width: '32px', height: '32px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                ✕
+                            </button>
                         </div>
 
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee' }}>
-                            <input
-                                type="text"
-                                placeholder="🔍 Search menu items..."
-                                value={menuSearch}
-                                onChange={(e) => setMenuSearch(e.target.value)}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
-                            />
+                        {/* Search & Category Pills */}
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid #E2E8F0', background: '#FFFFFF', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    placeholder="🔍 Search items by name or category..."
+                                    value={menuSearch}
+                                    onChange={(e) => setMenuSearch(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                                />
+                                {menuSearch && (
+                                    <button onClick={() => setMenuSearch('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94A3B8', fontSize: '14px' }}>✕</button>
+                                )}
+                            </div>
+
+                            {/* Category Filter Pills */}
+                            {categories.length > 1 && (
+                                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                                    {categories.map((cat) => {
+                                        const isActive = selectedCategory === cat;
+                                        return (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setSelectedCategory(cat)}
+                                                style={{
+                                                    padding: '6px 14px',
+                                                    borderRadius: '100px',
+                                                    fontSize: '12px',
+                                                    fontWeight: 600,
+                                                    border: isActive ? 'none' : '1px solid #E2E8F0',
+                                                    background: isActive ? '#F59E0B' : '#F8FAFC',
+                                                    color: isActive ? '#FFFFFF' : '#475569',
+                                                    cursor: 'pointer',
+                                                    whiteSpace: 'nowrap',
+                                                    textTransform: 'capitalize',
+                                                    boxShadow: isActive ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none',
+                                                }}
+                                            >
+                                                {cat === 'all' ? '✨ All Categories' : cat}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+                        {/* Menu Items List */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#F8FAFC' }}>
                             {menuLoading ? (
-                                <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>Loading menu items...</div>
+                                <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+                                    <div className="loader-spinner" style={{ margin: '0 auto 12px', width: '28px', height: '28px' }}></div>
+                                    Fetching menu items...
+                                </div>
                             ) : filteredMenuItems.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>No matching items found in menu.</div>
+                                <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+                                    <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🍽️</span>
+                                    <p style={{ margin: 0, fontWeight: 500 }}>No items match your search.</p>
+                                </div>
                             ) : (
                                 <div style={{ display: 'grid', gap: '10px' }}>
                                     {filteredMenuItems.map((item) => {
                                         const qty = addItemCart[item.id]?.quantity || 0;
                                         return (
-                                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', border: '1px solid #eee', background: qty > 0 ? '#fff8f0' : '#fff' }}>
+                                            <div
+                                                key={item.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '12px 16px',
+                                                    borderRadius: '12px',
+                                                    border: qty > 0 ? '1.5px solid #F59E0B' : '1px solid #E2E8F0',
+                                                    background: qty > 0 ? '#FFFBEB' : '#FFFFFF',
+                                                    boxShadow: qty > 0 ? '0 4px 12px rgba(245, 158, 11, 0.08)' : '0 1px 3px rgba(15, 23, 42, 0.03)',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                {item.image && (
+                                                    <img src={item.image} alt={item.name} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0, marginRight: '12px' }} />
+                                                )}
                                                 <div style={{ flex: 1, paddingRight: '12px' }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#222' }}>
-                                                        {item.isVeg ? '🟢' : '🔴'} {item.name}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <VegBadge isVeg={item.isVeg !== false} />
+                                                        <span style={{ fontWeight: 600, fontSize: '14px', color: '#0F172A' }}>{item.name}</span>
                                                     </div>
-                                                    <div style={{ fontSize: '13px', color: '#666', marginTop: '2px' }}>
-                                                        ₹{item.price} {item.category ? `• ${item.category}` : ''}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#D97706' }}>₹{item.price}</span>
+                                                        {item.category && (
+                                                            <span style={{ background: '#F1F5F9', color: '#64748B', fontSize: '11px', padding: '1px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>{item.category}</span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0f0f0', borderRadius: '8px', padding: '4px 8px' }}>
+
+                                                {/* Quantity Controls */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F1F5F9', borderRadius: '8px', padding: '4px', border: '1px solid #E2E8F0' }}>
                                                     <button
                                                         onClick={() => handleUpdateCartQty(item, -1)}
                                                         disabled={qty === 0}
-                                                        style={{ border: 'none', background: 'transparent', cursor: qty > 0 ? 'pointer' : 'default', fontSize: '16px', fontWeight: 'bold', width: '24px', height: '24px', opacity: qty > 0 ? 1 : 0.4 }}
+                                                        style={{
+                                                            border: 'none',
+                                                            background: qty > 0 ? '#FFFFFF' : 'transparent',
+                                                            color: qty > 0 ? '#0F172A' : '#94A3B8',
+                                                            cursor: qty > 0 ? 'pointer' : 'default',
+                                                            fontSize: '14px',
+                                                            fontWeight: 700,
+                                                            width: '26px',
+                                                            height: '26px',
+                                                            borderRadius: '6px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                        }}
                                                     >
-                                                        -
+                                                        −
                                                     </button>
-                                                    <span style={{ fontWeight: 700, fontSize: '14px', minWidth: '18px', textAlign: 'center' }}>{qty}</span>
+                                                    <span style={{ fontWeight: 700, fontSize: '13px', minWidth: '22px', textAlign: 'center', color: qty > 0 ? '#D97706' : '#64748B' }}>{qty}</span>
                                                     <button
                                                         onClick={() => handleUpdateCartQty(item, 1)}
-                                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', width: '24px', height: '24px' }}
+                                                        style={{
+                                                            border: 'none',
+                                                            background: '#FFFFFF',
+                                                            color: '#0F172A',
+                                                            cursor: 'pointer',
+                                                            fontSize: '14px',
+                                                            fontWeight: 700,
+                                                            width: '26px',
+                                                            height: '26px',
+                                                            borderRadius: '6px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                        }}
                                                     >
                                                         +
                                                     </button>
@@ -704,26 +856,70 @@ export default function TablesPage() {
                             )}
                         </div>
 
-                        <div style={{ padding: '16px 20px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
-                            <div style={{ fontSize: '15px', fontWeight: 700, color: '#111' }}>
-                                Selected Total: ₹{Object.values(addItemCart).reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)}
+                        {/* Footer Bar */}
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF' }}>
+                            <div>
+                                <span style={{ fontSize: '12px', color: '#64748B', display: 'block' }}>Total Selected</span>
+                                <span style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>₹{Object.values(addItemCart).reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)}</span>
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+
+                            <div style={{ display: 'flex', gap: '10px' }}>
                                 <button
                                     onClick={() => window.open(getQrUrl(selectedTable), '_blank')}
-                                    style={{ padding: '8px 12px', fontSize: '13px', background: 'transparent', border: '1px solid #ccc', borderRadius: '8px', cursor: 'pointer', color: '#555' }}
-                                    title="Open Customer App QR link"
+                                    style={{ padding: '9px 14px', fontSize: '13px', fontWeight: 600, background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '10px', cursor: 'pointer', color: '#475569' }}
+                                    title="Open Customer QR Menu Link"
                                 >
                                     🌐 Customer QR Link
                                 </button>
                                 <button
                                     onClick={handleAddItemsToBill}
                                     disabled={addingToBill || Object.keys(addItemCart).length === 0}
-                                    style={{ padding: '8px 16px', fontSize: '14px', fontWeight: 600, background: Object.keys(addItemCart).length > 0 ? '#d97706' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: Object.keys(addItemCart).length > 0 ? 'pointer' : 'not-allowed' }}
+                                    style={{
+                                        padding: '9px 20px',
+                                        fontSize: '14px',
+                                        fontWeight: 700,
+                                        background: Object.keys(addItemCart).length > 0 ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : '#E2E8F0',
+                                        color: Object.keys(addItemCart).length > 0 ? '#FFFFFF' : '#94A3B8',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        cursor: Object.keys(addItemCart).length > 0 ? 'pointer' : 'not-allowed',
+                                        boxShadow: Object.keys(addItemCart).length > 0 ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none',
+                                        transition: 'all 0.2s',
+                                    }}
                                 >
-                                    {addingToBill ? 'Adding...' : `Add to Table ${selectedTable} Order`}
+                                    {addingToBill ? 'Adding Items...' : `Add to Table ${selectedTable} Order`}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirm Close Bill Modal */}
+            {confirmCloseTable && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}>
+                    <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '36px', marginBottom: '12px' }}>💳</div>
+                        <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>Close Bill for Table {confirmCloseTable}?</h3>
+                        <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748B' }}>Total Amount: <strong style={{ color: '#0F172A' }}>₹{sessions[confirmCloseTable]?.total?.toFixed(0)}</strong>. The bill will be printed automatically and marked as paid.</p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                            <button onClick={() => setConfirmCloseTable(null)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={() => executeCloseSession(confirmCloseTable)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#10B981', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}>Close Bill</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirm Delete Item Modal */}
+            {confirmDeleteItem && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}>
+                    <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '36px', marginBottom: '12px' }}>🗑️</div>
+                        <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>Remove Item?</h3>
+                        <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748B' }}>Are you sure you want to remove <strong>{confirmDeleteItem.item?.name}</strong> from Table {selectedTable}'s order?</p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                            <button onClick={() => setConfirmDeleteItem(null)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={() => executeDeleteItem(confirmDeleteItem.order, confirmDeleteItem.itemIndex)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#EF4444', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}>Remove Item</button>
                         </div>
                     </div>
                 </div>
@@ -731,4 +927,5 @@ export default function TablesPage() {
         </div>
     );
 }
+
 
