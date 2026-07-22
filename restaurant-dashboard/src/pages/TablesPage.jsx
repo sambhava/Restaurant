@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { encodeOrderToken } from '../utils/tokenUtils';
+import { encodeOrderToken, getCustomerAppUrl } from '../utils/tokenUtils';
 import {
 
     collection,
@@ -26,28 +26,8 @@ export default function TablesPage() {
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [loading, setLoading] = useState(true);
 
-
-
-    // Construct URL for customer app dynamically
-    const getCustomerAppUrl = () => {
-        if (import.meta.env.VITE_CUSTOMER_APP_URL) {
-            return import.meta.env.VITE_CUSTOMER_APP_URL;
-        }
-        const { protocol, hostname } = window.location;
-        // If on localhost, point to the Vite development port
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return `${protocol}//${hostname}:5173`;
-        }
-        // If on Cloudflare Pages, map dashboard subdomain to customer subdomain
-        if (hostname.includes('restaurant-dashboard')) {
-            const customerHostname = hostname.replace('restaurant-dashboard', 'restaurant-customer');
-            return `${protocol}//${customerHostname}`;
-        }
-        // Production fallback
-        return `${protocol}//${hostname}`;
-    };
-
     const customerAppUrl = getCustomerAppUrl();
+
 
     useEffect(() => {
         // Load saved table count from Firestore

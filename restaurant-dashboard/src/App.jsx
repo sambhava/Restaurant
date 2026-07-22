@@ -9,6 +9,21 @@ import TablesPage from './pages/TablesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { getCustomerAppUrl } from './utils/tokenUtils';
+
+function OrderRedirect() {
+  useEffect(() => {
+    const customerUrl = getCustomerAppUrl();
+    const target = `${customerUrl}/order${window.location.search}`;
+    window.location.href = target;
+  }, []);
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+      Redirecting to menu...
+    </div>
+  );
+}
 
 function App() {
   const initAuth = useAuthStore((s) => s.initAuth);
@@ -22,6 +37,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/order" element={<OrderRedirect />} />
           <Route
             path="/dashboard"
             element={
@@ -44,3 +60,4 @@ function App() {
 }
 
 export default App;
+
