@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { encodeOrderToken, getCustomerAppUrl } from '../utils/tokenUtils';
 import {
-
     collection,
     getDocs,
     doc,
     updateDoc,
     setDoc,
+    addDoc,
     query,
     where,
     getDoc,
     onSnapshot,
+    arrayUnion,
+    increment,
+    serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import useAuthStore from '../store/authStore';
@@ -26,7 +29,16 @@ export default function TablesPage() {
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Modal state for adding items to table directly from dashboard
+    const [showAddItemModal, setShowAddItemModal] = useState(false);
+    const [menuItems, setMenuItems] = useState([]);
+    const [menuLoading, setMenuLoading] = useState(false);
+    const [menuSearch, setMenuSearch] = useState('');
+    const [addItemCart, setAddItemCart] = useState({});
+    const [addingToBill, setAddingToBill] = useState(false);
+
     const customerAppUrl = getCustomerAppUrl();
+
 
 
     useEffect(() => {
@@ -189,10 +201,126 @@ export default function TablesPage() {
         }
     };
 
+    const loadMenuItems = async () => {
+        if (!restaurantId) return;
+        setMenuLoading(true);
+        try {
+            const ref = collection(db, 'restaurants', restaurantId, 'menuItems');
+            const snap = await getDocs(ref);
+            setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) {
+            console.error('Error fetching menu items:', err);
+        } finally {
+            setMenuLoading(false);
+        }
+    };
+
+    const openAddItemModal = () => {
+        setShowAddItemModal(true);
+        setAddItemCart({});
+        setMenuSearch('');
+        loadMenuItems();
+    };
+
+    const handleUpdateCartQty = (item, delta) => {
+        const key = item.id;
+        setAddItemCart(prev => {
+            const current = prev[key] || { item, quantity: 0, price: parseFloat(item.price) || 0 };
+            const newQty = Math.max(0, current.quantity + delta);
+            if (newQty === 0) {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+            }
+            return {
+                ...prev,
+                [key]: { item, quantity: newQty, price: parseFloat(item.price) || 0 }
+            };
+        });
+    };
+
+    const handleAddItemsToBill = async () => {
+        const cartEntries = Object.values(addItemCart);
+        if (cartEntries.length === 0 || !selectedTable) return;
+        setAddingToBill(true);
+
+        try {
+            let session = sessions[selectedTable];
+            let sessionId = session?.id;
+
+            // 1. If no active session, create one
+            if (!session) {
+                const sessionRef = doc(collection(db, 'restaurants', restaurantId, 'sessions'));
+                sessionId = sessionRef.id;
+                await setDoc(sessionRef, {
+                    tableNumber: selectedTable,
+                    status: 'active',
+                    orderIds: [],
+                    subtotal: 0,
+                    tax: 0,
+                    total: 0,
+                    startedAt: serverTimestamp(),
+                });
+            }
+
+            // 2. Prepare items for order
+            const orderItems = cartEntries.map(({ item, quantity, price }) => ({
+                itemId: item.id,
+                name: item.name,
+                quantity,
+                price,
+                subtotal: price * quantity,
+                addedBy: 'staff',
+            }));
+
+            const orderSubtotal = orderItems.reduce((sum, i) => sum + i.subtotal, 0);
+            const orderTax = orderSubtotal * 0.05;
+            const orderTotal = orderSubtotal + orderTax;
+
+            // 3. Create Order
+            const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
+            const newOrderRef = await addDoc(ordersRef, {
+                tableNumber: selectedTable,
+                sessionId,
+                items: orderItems,
+                status: 'accepted',
+                subtotal: orderSubtotal,
+                tax: orderTax,
+                total: orderTotal,
+                orderedAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                addedBy: 'staff',
+            });
+
+            // 4. Update Session totals and orderIds
+            const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', sessionId);
+            await updateDoc(sessionRef, {
+                orderIds: arrayUnion(newOrderRef.id),
+                subtotal: increment(orderSubtotal),
+                tax: increment(orderTax),
+                total: increment(orderTotal),
+            });
+
+            setShowAddItemModal(false);
+            setAddItemCart({});
+        } catch (err) {
+            console.error('Error adding items to table order:', err);
+            alert('Failed to add items to order. Please try again.');
+        } finally {
+            setAddingToBill(false);
+        }
+    };
+
+    const filteredMenuItems = menuItems.filter(item =>
+        item.name?.toLowerCase().includes(menuSearch.toLowerCase()) ||
+        item.category?.toLowerCase().includes(menuSearch.toLowerCase())
+    );
+
     const getQrUrl = (tableNum) => {
         const token = encodeOrderToken(restaurantId, tableNum);
         return `${customerAppUrl}/order?token=${token}`;
     };
+
 
     const printBill = (tableNum) => {
         const session = sessions[tableNum];
@@ -401,9 +529,9 @@ export default function TablesPage() {
                                         <h3 className="bill-title" style={{ margin: 0 }}>📋 Bill Details</h3>
                                         <button
                                             className="add-item-btn"
-                                            onClick={() => window.open(getQrUrl(selectedTable), '_blank')}
+                                            onClick={openAddItemModal}
                                             style={{ padding: '6px 12px', fontSize: '13px', background: '#333', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                                            title="Open Customer Menu to Add Items"
+                                            title="Add Items to Table Bill"
                                         >
                                             ➕ Add Item
                                         </button>
@@ -511,6 +639,96 @@ export default function TablesPage() {
                     </div>
                 </div>
             )}
+
+            {/* In-Dashboard Add Item Modal */}
+            {showAddItemModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                    <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', overflow: 'hidden', color: '#333' }}>
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111' }}>➕ Add Items — Table {selectedTable}</h3>
+                                <span style={{ fontSize: '12px', color: '#666' }}>Select items from your menu to add to this bill</span>
+                            </div>
+                            <button onClick={() => setShowAddItemModal(false)} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>✕</button>
+                        </div>
+
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee' }}>
+                            <input
+                                type="text"
+                                placeholder="🔍 Search menu items..."
+                                value={menuSearch}
+                                onChange={(e) => setMenuSearch(e.target.value)}
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
+                            />
+                        </div>
+
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+                            {menuLoading ? (
+                                <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>Loading menu items...</div>
+                            ) : filteredMenuItems.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '32px', color: '#666' }}>No matching items found in menu.</div>
+                            ) : (
+                                <div style={{ display: 'grid', gap: '10px' }}>
+                                    {filteredMenuItems.map((item) => {
+                                        const qty = addItemCart[item.id]?.quantity || 0;
+                                        return (
+                                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', border: '1px solid #eee', background: qty > 0 ? '#fff8f0' : '#fff' }}>
+                                                <div style={{ flex: 1, paddingRight: '12px' }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#222' }}>
+                                                        {item.isVeg ? '🟢' : '🔴'} {item.name}
+                                                    </div>
+                                                    <div style={{ fontSize: '13px', color: '#666', marginTop: '2px' }}>
+                                                        ₹{item.price} {item.category ? `• ${item.category}` : ''}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f0f0f0', borderRadius: '8px', padding: '4px 8px' }}>
+                                                    <button
+                                                        onClick={() => handleUpdateCartQty(item, -1)}
+                                                        disabled={qty === 0}
+                                                        style={{ border: 'none', background: 'transparent', cursor: qty > 0 ? 'pointer' : 'default', fontSize: '16px', fontWeight: 'bold', width: '24px', height: '24px', opacity: qty > 0 ? 1 : 0.4 }}
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <span style={{ fontWeight: 700, fontSize: '14px', minWidth: '18px', textAlign: 'center' }}>{qty}</span>
+                                                    <button
+                                                        onClick={() => handleUpdateCartQty(item, 1)}
+                                                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', width: '24px', height: '24px' }}
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ padding: '16px 20px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
+                            <div style={{ fontSize: '15px', fontWeight: 700, color: '#111' }}>
+                                Selected Total: ₹{Object.values(addItemCart).reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    onClick={() => window.open(getQrUrl(selectedTable), '_blank')}
+                                    style={{ padding: '8px 12px', fontSize: '13px', background: 'transparent', border: '1px solid #ccc', borderRadius: '8px', cursor: 'pointer', color: '#555' }}
+                                    title="Open Customer App QR link"
+                                >
+                                    🌐 Customer QR Link
+                                </button>
+                                <button
+                                    onClick={handleAddItemsToBill}
+                                    disabled={addingToBill || Object.keys(addItemCart).length === 0}
+                                    style={{ padding: '8px 16px', fontSize: '14px', fontWeight: 600, background: Object.keys(addItemCart).length > 0 ? '#d97706' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: Object.keys(addItemCart).length > 0 ? 'pointer' : 'not-allowed' }}
+                                >
+                                    {addingToBill ? 'Adding...' : `Add to Table ${selectedTable} Order`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
