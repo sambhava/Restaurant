@@ -195,6 +195,9 @@ export default function LoginPage() {
 
     const formatError = (err) => {
         if (!err) return '';
+        if (err.includes('auth/too-many-requests')) {
+            return "Too many failed attempts. Account temporarily locked by Firebase. Please try again in a few minutes or check your email for the reset link.";
+        }
         if (err.includes('auth/requires-recent-login')) {
             return "Session expired. Please request a new verification code.";
         }
