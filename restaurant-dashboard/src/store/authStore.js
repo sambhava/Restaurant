@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 /**
@@ -85,27 +85,54 @@ const useAuthStore = create((set, get) => ({
                 if (authErr.code === 'auth/user-not-found') {
                     userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 } else if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
-                    // Fallback check: If password was updated via website OTP reset
-                    const sanitizedUid = `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                    const userDocSnap = await getDoc(doc(db, 'users', sanitizedUid)).catch(() => null);
-                    
-                    if (userDocSnap && userDocSnap.exists()) {
-                        const profile = userDocSnap.data();
-                        const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
-                        const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
+                    // Fallback check: Query Firestore users collection by email
+                    try {
+                        const q = query(collection(db, 'users'), where('email', '==', email));
+                        const snap = await getDocs(q).catch(() => null);
+                        if (snap && !snap.empty) {
+                            const userDoc = snap.docs[0];
+                            const profile = userDoc.data();
+                            const uid = userDoc.id;
+                            const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
+                            const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
 
-                        set({
-                            user: { uid: sanitizedUid, email },
-                            userProfile: profile,
-                            restaurantId: restId,
-                            restaurantName: restName,
-                            loading: false,
-                            error: null,
-                        });
+                            set({
+                                user: { uid, email },
+                                userProfile: profile,
+                                restaurantId: restId,
+                                restaurantName: restName,
+                                loading: false,
+                                error: null,
+                            });
 
-                        localStorage.setItem('restaurantId', restId);
-                        if (restName) localStorage.setItem('restaurantName', restName);
-                        return;
+                            localStorage.setItem('restaurantId', restId);
+                            if (restName) localStorage.setItem('restaurantName', restName);
+                            return;
+                        }
+
+                        // Also check sanitized UID doc
+                        const sanitizedUid = `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                        const userDocSnap = await getDoc(doc(db, 'users', sanitizedUid)).catch(() => null);
+                        if (userDocSnap && userDocSnap.exists()) {
+                            const profile = userDocSnap.data();
+                            const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
+                            const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
+
+                            set({
+                                user: { uid: sanitizedUid, email },
+                                userProfile: profile,
+                                restaurantId: restId,
+                                restaurantName: restName,
+                                loading: false,
+                                error: null,
+                            });
+
+                            localStorage.setItem('restaurantId', restId);
+                            if (restName) localStorage.setItem('restaurantName', restName);
+                            return;
+                        }
+                    } catch (fsErr) {
+                        console.log("Firestore fallback lookup note:", fsErr);
                     }
                     throw authErr;
                 } else {
