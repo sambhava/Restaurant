@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 /**
@@ -78,63 +78,12 @@ const useAuthStore = create((set, get) => ({
     login: async (email, password, restaurantName) => {
         try {
             set({ loading: true, error: null });
-            let userCredential = null;
+            let userCredential;
             try {
                 userCredential = await signInWithEmailAndPassword(auth, email, password);
             } catch (authErr) {
                 if (authErr.code === 'auth/user-not-found') {
                     userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                } else if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
-                    // Fallback check: Query Firestore users collection by email
-                    try {
-                        const q = query(collection(db, 'users'), where('email', '==', email));
-                        const snap = await getDocs(q).catch(() => null);
-                        if (snap && !snap.empty) {
-                            const userDoc = snap.docs[0];
-                            const profile = userDoc.data();
-                            const uid = userDoc.id;
-                            const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
-                            const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
-
-                            set({
-                                user: { uid, email },
-                                userProfile: profile,
-                                restaurantId: restId,
-                                restaurantName: restName,
-                                loading: false,
-                                error: null,
-                            });
-
-                            localStorage.setItem('restaurantId', restId);
-                            if (restName) localStorage.setItem('restaurantName', restName);
-                            return;
-                        }
-
-                        // Also check sanitized UID doc
-                        const sanitizedUid = `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                        const userDocSnap = await getDoc(doc(db, 'users', sanitizedUid)).catch(() => null);
-                        if (userDocSnap && userDocSnap.exists()) {
-                            const profile = userDocSnap.data();
-                            const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
-                            const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
-
-                            set({
-                                user: { uid: sanitizedUid, email },
-                                userProfile: profile,
-                                restaurantId: restId,
-                                restaurantName: restName,
-                                loading: false,
-                                error: null,
-                            });
-
-                            localStorage.setItem('restaurantId', restId);
-                            if (restName) localStorage.setItem('restaurantName', restName);
-                            return;
-                        }
-                    } catch (fsErr) {
-                        console.log("Firestore fallback lookup note:", fsErr);
-                    }
-                    throw authErr;
                 } else {
                     throw authErr;
                 }
@@ -215,29 +164,63 @@ const useAuthStore = create((set, get) => ({
         try {
             set({ loading: true, error: null });
 
-            // 1. Sign out any stale session first
-            await signOut(auth).catch(() => {});
-
-            // 2. Trigger password reset email via Firebase Auth API
+            // 1. Trigger password reset email via Firebase Auth API
             await sendPasswordResetEmail(auth, email).catch(() => {});
 
-            // 3. Authenticate or create user account with new password
-            let userObj = null;
-            try {
-                let userCredential;
+            // 2. Try registering or signing in to ensure account is valid
+            let userObj = auth.currentUser;
+            if (!userObj) {
                 try {
-                    userCredential = await signInWithEmailAndPassword(auth, email, newPassword);
-                } catch (loginErr) {
-                    if (loginErr.code === 'auth/user-not-found') {
-                        userCredential = await createUserWithEmailAndPassword(auth, email, newPassword);
+                    const cred = await createUserWithEmailAndPassword(auth, email, newPassword);
+                    userObj = cred.user;
+                } catch (createErr) {
+                    if (createErr.code === 'auth/email-already-in-use') {
+                        // User exists in Firebase Auth. Try signing in with newPassword if set
+                        try {
+                            const cred = await signInWithEmailAndPassword(auth, email, newPassword);
+                            userObj = cred.user;
+                        } catch (loginErr) {
+                            console.log("Firebase Auth user signin note:", loginErr.message);
+                        }
                     }
                 }
+            }
 
-                if (userCredential && userCredential.user) {
-                    userObj = userCredential.user;
+            // 3. If signed in, update password via Client Web SDK
+            if (userObj) {
+                await updatePassword(userObj, newPassword).catch(() => {});
+
+                const uid = userObj.uid;
+                const existingProfile = await getDoc(doc(db, 'users', uid)).catch(() => null);
+                
+                let restaurantId = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantId : '';
+                let restaurantName = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantName : '';
+                if (!restaurantId) {
+                    restaurantId = generateRestaurantId();
                 }
-            } catch (syncErr) {
-                console.log("Firebase Auth sync status:", syncErr.message);
+
+                await setDoc(doc(db, 'users', uid), {
+                    email,
+                    restaurantId,
+                    restaurantName,
+                    role: 'owner',
+                    passwordUpdatedAt: new Date(),
+                    updatedAt: new Date(),
+                }, { merge: true });
+
+                set({
+                    user: userObj,
+                    userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
+                    restaurantId,
+                    restaurantName,
+                    loading: false,
+                    error: null,
+                });
+
+                if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
+                if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
+            } else {
+                set({ loading: false });
             }
 
             if (import.meta.env.PROD) {
@@ -252,38 +235,6 @@ const useAuthStore = create((set, get) => ({
                 }
             }
 
-            // 4. Update Firestore user database record & set user state for instant website login
-            const uid = userObj ? userObj.uid : `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-            const userDocRef = doc(db, 'users', uid);
-            const existingProfile = await getDoc(userDocRef).catch(() => null);
-            
-            let restaurantId = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantId : '';
-            let restaurantName = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantName : '';
-            if (!restaurantId) {
-                restaurantId = generateRestaurantId();
-            }
-
-            await setDoc(userDocRef, {
-                email,
-                restaurantId,
-                restaurantName,
-                role: 'owner',
-                passwordUpdatedAt: new Date(),
-                updatedAt: new Date(),
-            }, { merge: true });
-
-            set({
-                user: userObj || { uid, email },
-                userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
-                restaurantId,
-                restaurantName,
-                loading: false,
-                error: null,
-            });
-
-            if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
-            if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
-
         } catch (err) {
             set({ error: err.message, loading: false });
             throw err;
@@ -296,4 +247,3 @@ const useAuthStore = create((set, get) => ({
 }));
 
 export default useAuthStore;
-

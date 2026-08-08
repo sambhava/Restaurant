@@ -13,8 +13,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if request.auth.uid == userId;
     }
 
     match /restaurants/{restaurantId} {
