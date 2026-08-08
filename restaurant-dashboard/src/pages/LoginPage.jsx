@@ -195,6 +195,9 @@ export default function LoginPage() {
 
     const formatError = (err) => {
         if (!err) return '';
+        if (err.includes('auth/requires-recent-login')) {
+            return "Session expired. Please request a new verification code.";
+        }
         if (err.includes('auth/invalid-credential') || err.includes('auth/user-not-found') || err.includes('auth/wrong-password')) {
             return "Invalid credentials. Try again";
         }

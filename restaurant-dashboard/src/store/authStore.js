@@ -164,8 +164,20 @@ const useAuthStore = create((set, get) => ({
             let userObj = auth.currentUser;
             
             if (userObj && userObj.email === email) {
-                await updatePassword(userObj, newPassword);
-            } else {
+                try {
+                    await updatePassword(userObj, newPassword);
+                } catch (updateErr) {
+                    if (updateErr.code === 'auth/requires-recent-login' || updateErr.message?.includes('requires-recent-login')) {
+                        console.log("Stale user session detected. Signing out stale user for fresh reset.");
+                        await signOut(auth).catch(() => {});
+                        userObj = null;
+                    } else {
+                        throw updateErr;
+                    }
+                }
+            }
+
+            if (!userObj || userObj.email !== email) {
                 try {
                     await sendPasswordResetEmail(auth, email).catch(() => {});
                     let userCredential;
@@ -174,8 +186,8 @@ const useAuthStore = create((set, get) => ({
                     } catch (loginErr) {
                         if (loginErr.code === 'auth/user-not-found') {
                             userCredential = await createUserWithEmailAndPassword(auth, email, newPassword);
-                        } else if (userObj) {
-                            await updatePassword(userObj, newPassword).catch(() => {});
+                        } else if (loginErr.code === 'auth/invalid-credential' || loginErr.code === 'auth/wrong-password') {
+                            await sendPasswordResetEmail(auth, email).catch(() => {});
                         }
                     }
 
@@ -199,16 +211,18 @@ const useAuthStore = create((set, get) => ({
                 }
             }
 
-            if (userObj) {
-                const uid = userObj.uid;
-                const existingProfile = await getDoc(doc(db, 'users', uid));
-                let restaurantId = existingProfile.exists() ? existingProfile.data().restaurantId : '';
-                let restaurantName = existingProfile.exists() ? existingProfile.data().restaurantName : '';
+            try {
+                const uid = userObj ? userObj.uid : `user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                const userDocRef = doc(db, 'users', uid);
+                const existingProfile = await getDoc(userDocRef).catch(() => null);
+                
+                let restaurantId = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantId : '';
+                let restaurantName = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantName : '';
                 if (!restaurantId) {
                     restaurantId = generateRestaurantId();
                 }
 
-                await setDoc(doc(db, 'users', uid), {
+                await setDoc(userDocRef, {
                     email,
                     restaurantId,
                     restaurantName,
@@ -218,8 +232,8 @@ const useAuthStore = create((set, get) => ({
                 }, { merge: true });
 
                 set({
-                    user: userObj,
-                    userProfile: existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
+                    user: userObj || { uid, email },
+                    userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
                     restaurantId,
                     restaurantName,
                     loading: false,
@@ -228,7 +242,8 @@ const useAuthStore = create((set, get) => ({
 
                 if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
                 if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
-            } else {
+            } catch (fsErr) {
+                console.error("Firestore user doc update error:", fsErr);
                 set({ loading: false });
             }
 
