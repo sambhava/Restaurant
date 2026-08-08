@@ -78,7 +78,16 @@ const useAuthStore = create((set, get) => ({
     login: async (email, password, restaurantName) => {
         try {
             set({ loading: true, error: null });
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            let userCredential;
+            try {
+                userCredential = await signInWithEmailAndPassword(auth, email, password);
+            } catch (authErr) {
+                if (authErr.code === 'auth/user-not-found') {
+                    userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    throw authErr;
+                }
+            }
             const uid = userCredential.user.uid;
 
             // Check if user already has a restaurantId
