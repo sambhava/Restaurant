@@ -87,9 +87,9 @@ export default function OrderCard({ order, onStatusUpdate }) {
                     <span className="order-table">Table {order.tableNumber}</span>
                     <span className="order-id">#{order.id.slice(-5).toUpperCase()}</span>
                 </div>
-                <div className="order-header-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="order-header-badges">
                     <span className={`order-timer-badge ${getTimerUrgencyClass(elapsedSeconds, order.status)}`}>
-                        ⏱️ {order.status === 'served' ? `Served in ${formatTimer(elapsedSeconds)}` : formatTimer(elapsedSeconds)}
+                        ⏱️ {formatTimer(elapsedSeconds)}
                     </span>
                     <span
                         className="order-status-badge"
