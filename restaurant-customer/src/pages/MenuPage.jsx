@@ -179,16 +179,15 @@ export default function MenuPage() {
             {/* Header */}
             <header className="menu-header">
                 <div className="menu-header-content">
-                    {(restaurantInfo?.logoUrl || restaurantInfo?.logo || restaurantInfo?.branding?.logo) && (
-                        <img
-                            src={restaurantInfo.logoUrl || restaurantInfo.logo || restaurantInfo.branding.logo}
-                            alt="logo"
-                            className="restaurant-logo"
-                        />
-                    )}
+                    <img
+                        src={restaurantInfo?.logoUrl || restaurantInfo?.logo || restaurantInfo?.branding?.logo || '/logo.jpg'}
+                        alt="logo"
+                        className="restaurant-logo"
+                        style={{ backgroundColor: '#ffffff', objectFit: 'contain', padding: '2px' }}
+                    />
                     <div>
                         <h1 className="restaurant-name">
-                            {restaurantInfo?.name || 'Restaurant'}
+                            {restaurantInfo?.name || 'Pinch Of Salt'}
                         </h1>
                         <p className="table-info">Table {tableNumber}</p>
                     </div>

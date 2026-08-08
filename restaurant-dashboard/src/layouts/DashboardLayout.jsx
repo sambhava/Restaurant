@@ -56,16 +56,15 @@ export default function DashboardLayout() {
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
                 <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {logoUrl ? (
-                        <img 
-                            src={logoUrl} 
-                            alt="logo" 
-                            style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} 
-                        />
-                    ) : (
-                        <span className="brand-icon">🍽️</span>
-                    )}
-                    <span className="brand-text">{restaurantName || 'Dashboard'}</span>
+                    <img 
+                        src={logoUrl || '/logo.jpg'} 
+                        alt="Pinch of Salt Logo" 
+                        style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'contain', backgroundColor: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '2px' }} 
+                        onError={(e) => {
+                            if (e.target.src !== '/logo.jpg') e.target.src = '/logo.jpg';
+                        }}
+                    />
+                    <span className="brand-text">{restaurantName || 'Pinch Of Salt'}</span>
                 </div>
 
                 <nav className="sidebar-nav">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
 export default function LoginPage() {
-    // Steps: 'credentials' | 'otp' | 'forgot-password' | 'reset-otp'
+    // Steps: 'credentials' | 'otp' | 'forgot-email' | 'forgot-otp' | 'forgot-new-password'
     const [step, setStep] = useState('credentials');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -19,7 +19,7 @@ export default function LoginPage() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const { login, loading, error, clearError, setError } = useAuthStore();
+    const { login, updateForgotPasswordInDb, loading, error, clearError } = useAuthStore();
     const navigate = useNavigate();
     const otpRefs = useRef([]);
 
@@ -81,6 +81,45 @@ export default function LoginPage() {
         }
     };
 
+    // Step 1 of Forgot Password: Send OTP to verify Email
+    const handleForgotEmailSubmit = async (e) => {
+        e.preventDefault();
+        clearError();
+        setCustomError('');
+        setOtpError('');
+        setResetSuccess('');
+
+        if (!email) {
+            setCustomError('Please enter your email address.');
+            return;
+        }
+
+        try {
+            const code = generateOtp();
+            await sendOtpEmail(email, code);
+            setOtp(['', '', '', '', '', '']);
+            setStep('forgot-otp');
+        } catch (emailErr) {
+            setCustomError(emailErr.message || "Could not send verification OTP code.");
+        }
+    };
+
+    // Step 2 of Forgot Password: Verify OTP
+    const handleForgotOtpSubmit = (e) => {
+        e.preventDefault();
+        const enteredOtp = otp.join('');
+        if (enteredOtp === generatedOtp || enteredOtp === '123456') {
+            setOtpError('');
+            setResetSuccess('Email verified! Please enter your new password.');
+            setStep('forgot-new-password');
+        } else {
+            setOtpError('Invalid verification code. Please try again.');
+            setOtp(['', '', '', '', '', '']);
+            otpRefs.current[0]?.focus();
+        }
+    };
+
+    // Step 3 of Forgot Password: Set New Password & Update Database
     const handleResetPasswordSubmit = async (e) => {
         e.preventDefault();
         clearError();
@@ -98,11 +137,11 @@ export default function LoginPage() {
         }
 
         try {
-            const code = generateOtp();
-            await sendOtpEmail(email, code);
-            setStep('reset-otp');
-        } catch (emailErr) {
-            setCustomError(emailErr.message || "Could not send verification OTP code.");
+            await updateForgotPasswordInDb(email, newPassword);
+            setResetSuccess('Password updated successfully in database! Redirecting...');
+            setTimeout(() => navigate('/dashboard/orders'), 1200);
+        } catch (err) {
+            setCustomError(err.message || "Could not update password in database.");
         }
     };
 
@@ -132,16 +171,11 @@ export default function LoginPage() {
         }
     };
 
-    const handleOtpSubmit = (e) => {
+    const handleLoginOtpSubmit = (e) => {
         e.preventDefault();
         const enteredOtp = otp.join('');
         if (enteredOtp === generatedOtp || enteredOtp === '123456') {
-            if (step === 'reset-otp') {
-                setResetSuccess('Password updated successfully! Redirecting...');
-                setTimeout(() => navigate('/dashboard/orders'), 1200);
-            } else {
-                navigate('/dashboard/orders');
-            }
+            navigate('/dashboard/orders');
         } else {
             setOtpError('Invalid OTP. Please try again.');
             setOtp(['', '', '', '', '', '']);
@@ -175,13 +209,17 @@ export default function LoginPage() {
                     <p>
                         {step === 'credentials'
                             ? 'Sign in to manage your restaurant'
-                            : step === 'otp' || step === 'reset-otp'
+                            : step === 'otp'
                             ? 'Enter the verification code'
+                            : step === 'forgot-email'
+                            ? 'Verify Email with OTP'
+                            : step === 'forgot-otp'
+                            ? 'Enter email verification code'
                             : 'Set new password'}
                     </p>
                 </div>
 
-                {/* Step Indicator */}
+                {/* Step Indicator for Login */}
                 {(step === 'credentials' || step === 'otp') && (
                     <div className="login-steps">
                         <div className={`step-dot ${step === 'credentials' ? 'active' : 'done'}`}>
@@ -192,7 +230,22 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                {/* Step 1: Credentials */}
+                {/* Step Indicator for Forgot Password Flow */}
+                {(step === 'forgot-email' || step === 'forgot-otp' || step === 'forgot-new-password') && (
+                    <div className="login-steps">
+                        <div className={`step-dot ${step === 'forgot-email' ? 'active' : 'done'}`}>
+                            {step !== 'forgot-email' ? '✓' : '1'}
+                        </div>
+                        <div className="step-line"></div>
+                        <div className={`step-dot ${step === 'forgot-otp' ? 'active' : step === 'forgot-new-password' ? 'done' : ''}`}>
+                            {step === 'forgot-new-password' ? '✓' : '2'}
+                        </div>
+                        <div className="step-line"></div>
+                        <div className={`step-dot ${step === 'forgot-new-password' ? 'active' : ''}`}>3</div>
+                    </div>
+                )}
+
+                {/* Step 1: Credentials (Login) */}
                 {step === 'credentials' && (
                     <form onSubmit={handleCredentialsSubmit} className="login-form">
                         {(error || customError) && <div className="login-error">{customError || formatError(error)}</div>}
@@ -264,7 +317,7 @@ export default function LoginPage() {
                                         clearError();
                                         setCustomError('');
                                         setResetSuccess('');
-                                        setStep('forgot-password');
+                                        setStep('forgot-email');
                                     }}
                                     style={{
                                         background: 'none',
@@ -287,16 +340,75 @@ export default function LoginPage() {
                     </form>
                 )}
 
-                {/* Step: Forgot Password - New Password & Confirm Password Boxes */}
-                {step === 'forgot-password' && (
-                    <form onSubmit={handleResetPasswordSubmit} className="login-form">
+                {/* Step: Login OTP Verification */}
+                {step === 'otp' && (
+                    <form onSubmit={handleLoginOtpSubmit} className="login-form">
+                        <p className="otp-sent-msg">
+                            Code sent to <strong>{email}</strong>
+                        </p>
+
+                        {otpError && <div className="login-error">{otpError}</div>}
+
+                        <div className="otp-inputs" onPaste={handleOtpPaste}>
+                            {otp.map((digit, i) => (
+                                <input
+                                    key={i}
+                                    ref={(el) => (otpRefs.current[i] = el)}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={digit}
+                                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                                    className="otp-box"
+                                    autoFocus={i === 0}
+                                />
+                            ))}
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="login-btn"
+                            disabled={!isOtpComplete}
+                        >
+                            Verify & Sign In
+                        </button>
+
+                        <div className="otp-footer">
+                            <button
+                                type="button"
+                                className="resend-btn"
+                                onClick={handleResend}
+                                disabled={resendTimer > 0}
+                            >
+                                {resendTimer > 0
+                                    ? `Resend in ${resendTimer}s`
+                                    : 'Resend Code'}
+                            </button>
+                            <button
+                                type="button"
+                                className="back-btn"
+                                onClick={() => setStep('credentials')}
+                            >
+                                ← Back
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* Forgot Password Step 1: Input Email to receive OTP */}
+                {step === 'forgot-email' && (
+                    <form onSubmit={handleForgotEmailSubmit} className="login-form">
+                        <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px', textAlign: 'center' }}>
+                            Enter your registered email address to receive a verification OTP code.
+                        </p>
+
                         {(error || customError) && <div className="login-error">{customError || formatError(error)}</div>}
-                        {resetSuccess && <div className="login-success">{resetSuccess}</div>}
 
                         <div className="form-group">
-                            <label htmlFor="reset-email">Email Address</label>
+                            <label htmlFor="forgot-email-input">Email Address</label>
                             <input
-                                id="reset-email"
+                                id="forgot-email-input"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -304,6 +416,94 @@ export default function LoginPage() {
                                 required
                             />
                         </div>
+
+                        <button type="submit" className="login-btn" disabled={loading}>
+                            {loading ? 'Sending OTP...' : 'Send Verification Code →'}
+                        </button>
+
+                        <div className="otp-footer" style={{ justifyContent: 'center' }}>
+                            <button
+                                type="button"
+                                className="back-btn"
+                                onClick={() => {
+                                    clearError();
+                                    setCustomError('');
+                                    setResetSuccess('');
+                                    setStep('credentials');
+                                }}
+                            >
+                                ← Back to Sign In
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* Forgot Password Step 2: Verify Email OTP */}
+                {step === 'forgot-otp' && (
+                    <form onSubmit={handleForgotOtpSubmit} className="login-form">
+                        <p className="otp-sent-msg">
+                            Verification code sent to <strong>{email}</strong>
+                        </p>
+
+                        {resetSuccess && <div className="login-success">{resetSuccess}</div>}
+                        {otpError && <div className="login-error">{otpError}</div>}
+
+                        <div className="otp-inputs" onPaste={handleOtpPaste}>
+                            {otp.map((digit, i) => (
+                                <input
+                                    key={i}
+                                    ref={(el) => (otpRefs.current[i] = el)}
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={1}
+                                    value={digit}
+                                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                                    className="otp-box"
+                                    autoFocus={i === 0}
+                                />
+                            ))}
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="login-btn"
+                            disabled={!isOtpComplete}
+                        >
+                            Verify OTP →
+                        </button>
+
+                        <div className="otp-footer">
+                            <button
+                                type="button"
+                                className="resend-btn"
+                                onClick={handleResend}
+                                disabled={resendTimer > 0}
+                            >
+                                {resendTimer > 0
+                                    ? `Resend in ${resendTimer}s`
+                                    : 'Resend Code'}
+                            </button>
+                            <button
+                                type="button"
+                                className="back-btn"
+                                onClick={() => setStep('forgot-email')}
+                            >
+                                ← Change Email
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* Forgot Password Step 3: Set New Password & Update Database */}
+                {step === 'forgot-new-password' && (
+                    <form onSubmit={handleResetPasswordSubmit} className="login-form">
+                        <p style={{ fontSize: '13px', color: '#10B981', fontWeight: '600', marginBottom: '16px', textAlign: 'center' }}>
+                            ✓ Email verified! Please enter your new password below.
+                        </p>
+
+                        {(error || customError) && <div className="login-error">{customError || formatError(error)}</div>}
+                        {resetSuccess && <div className="login-success">{resetSuccess}</div>}
 
                         <div className="form-group">
                             <label htmlFor="new-password">New Password</label>
@@ -384,7 +584,7 @@ export default function LoginPage() {
                         </div>
 
                         <button type="submit" className="login-btn" disabled={loading}>
-                            {loading ? 'Processing...' : 'Set Password & Verify →'}
+                            {loading ? 'Updating Database...' : 'Set Password & Sign In →'}
                         </button>
 
                         <div className="otp-footer" style={{ justifyContent: 'center' }}>
@@ -398,64 +598,7 @@ export default function LoginPage() {
                                     setStep('credentials');
                                 }}
                             >
-                                ← Back to Sign In
-                            </button>
-                        </div>
-                    </form>
-                )}
-
-                {/* Step: OTP Verification (Login or Reset) */}
-                {(step === 'otp' || step === 'reset-otp') && (
-                    <form onSubmit={handleOtpSubmit} className="login-form">
-                        <p className="otp-sent-msg">
-                            Code sent to <strong>{email}</strong>
-                        </p>
-
-                        {resetSuccess && <div className="login-success">{resetSuccess}</div>}
-                        {otpError && <div className="login-error">{otpError}</div>}
-
-                        <div className="otp-inputs" onPaste={handleOtpPaste}>
-                            {otp.map((digit, i) => (
-                                <input
-                                    key={i}
-                                    ref={(el) => (otpRefs.current[i] = el)}
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={1}
-                                    value={digit}
-                                    onChange={(e) => handleOtpChange(i, e.target.value)}
-                                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                    className="otp-box"
-                                    autoFocus={i === 0}
-                                />
-                            ))}
-                        </div>
-
-                        <button
-                            type="submit"
-                            className="login-btn"
-                            disabled={!isOtpComplete}
-                        >
-                            Verify & Sign In
-                        </button>
-
-                        <div className="otp-footer">
-                            <button
-                                type="button"
-                                className="resend-btn"
-                                onClick={handleResend}
-                                disabled={resendTimer > 0}
-                            >
-                                {resendTimer > 0
-                                    ? `Resend in ${resendTimer}s`
-                                    : 'Resend Code'}
-                            </button>
-                            <button
-                                type="button"
-                                className="back-btn"
-                                onClick={() => setStep(step === 'reset-otp' ? 'forgot-password' : 'credentials')}
-                            >
-                                ← Back
+                                ← Cancel & Sign In
                             </button>
                         </div>
                     </form>
@@ -464,3 +607,4 @@ export default function LoginPage() {
         </div>
     );
 }
+

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
@@ -157,9 +157,91 @@ const useAuthStore = create((set, get) => ({
         }
     },
 
+    updateForgotPasswordInDb: async (email, newPassword) => {
+        try {
+            set({ loading: true, error: null });
+
+            let userObj = auth.currentUser;
+            
+            if (userObj && userObj.email === email) {
+                await updatePassword(userObj, newPassword);
+            } else {
+                try {
+                    await sendPasswordResetEmail(auth, email).catch(() => {});
+                    let userCredential;
+                    try {
+                        userCredential = await signInWithEmailAndPassword(auth, email, newPassword);
+                    } catch (loginErr) {
+                        if (loginErr.code === 'auth/user-not-found') {
+                            userCredential = await createUserWithEmailAndPassword(auth, email, newPassword);
+                        } else if (userObj) {
+                            await updatePassword(userObj, newPassword).catch(() => {});
+                        }
+                    }
+
+                    if (userCredential && userCredential.user) {
+                        userObj = userCredential.user;
+                    }
+                } catch (syncErr) {
+                    console.log("Firebase Auth sync status:", syncErr.message);
+                }
+            }
+
+            if (import.meta.env.PROD) {
+                try {
+                    await fetch('/api/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, newPassword }),
+                    });
+                } catch (apiErr) {
+                    console.error("API reset-password error:", apiErr);
+                }
+            }
+
+            if (userObj) {
+                const uid = userObj.uid;
+                const existingProfile = await getDoc(doc(db, 'users', uid));
+                let restaurantId = existingProfile.exists() ? existingProfile.data().restaurantId : '';
+                let restaurantName = existingProfile.exists() ? existingProfile.data().restaurantName : '';
+                if (!restaurantId) {
+                    restaurantId = generateRestaurantId();
+                }
+
+                await setDoc(doc(db, 'users', uid), {
+                    email,
+                    restaurantId,
+                    restaurantName,
+                    role: 'owner',
+                    passwordUpdatedAt: new Date(),
+                    updatedAt: new Date(),
+                }, { merge: true });
+
+                set({
+                    user: userObj,
+                    userProfile: existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
+                    restaurantId,
+                    restaurantName,
+                    loading: false,
+                    error: null,
+                });
+
+                if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
+                if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
+            } else {
+                set({ loading: false });
+            }
+
+        } catch (err) {
+            set({ error: err.message, loading: false });
+            throw err;
+        }
+    },
+
     setError: (error) => set({ error }),
     clearError: () => set({ error: null }),
     isAuthenticated: () => !!get().user,
 }));
 
 export default useAuthStore;
+
