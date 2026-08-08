@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
@@ -143,6 +143,17 @@ const useAuthStore = create((set, get) => ({
             set({ restaurantName: '', restaurantId: '', unsubscribeProfile: null });
         } catch (err) {
             console.error('Logout error:', err);
+        }
+    },
+
+    resetPassword: async (email) => {
+        try {
+            set({ loading: true, error: null });
+            await sendPasswordResetEmail(auth, email);
+            set({ loading: false });
+        } catch (err) {
+            set({ error: err.message, loading: false });
+            throw err;
         }
     },
 

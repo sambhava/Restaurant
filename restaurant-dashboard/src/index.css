@@ -163,6 +163,16 @@ body {
   font-size: 13px;
 }
 
+.login-success {
+  background: rgba(46, 204, 113, 0.1);
+  border: 1px solid rgba(46, 204, 113, 0.25);
+  color: #27ae60;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
