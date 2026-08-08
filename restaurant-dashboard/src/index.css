@@ -582,11 +582,22 @@ body {
 
 .order-card-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
-  gap: 10px;
+}
+
+.order-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.order-header-bottom {
+  display: flex;
+  align-items: center;
 }
 
 .order-card-title {
@@ -594,7 +605,6 @@ body {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .order-table {
@@ -611,16 +621,8 @@ body {
   white-space: nowrap;
 }
 
-.order-header-badges {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 .order-status-badge {
-  padding: 5px 10px;
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 700;
@@ -635,14 +637,13 @@ body {
 .order-timer-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 9px;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 700;
   font-family: monospace;
   white-space: nowrap;
-  flex-shrink: 0;
   line-height: 1.2;
   transition: all 0.3s ease;
 }

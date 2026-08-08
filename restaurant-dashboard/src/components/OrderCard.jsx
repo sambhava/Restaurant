@@ -83,19 +83,21 @@ export default function OrderCard({ order, onStatusUpdate }) {
         <div className={`order-card status-${order.status}`}>
             {/* Header */}
             <div className="order-card-header">
-                <div className="order-card-title">
-                    <span className="order-table">Table {order.tableNumber}</span>
-                    <span className="order-id">#{order.id.slice(-5).toUpperCase()}</span>
-                </div>
-                <div className="order-header-badges">
-                    <span className={`order-timer-badge ${getTimerUrgencyClass(elapsedSeconds, order.status)}`}>
-                        ⏱️ {formatTimer(elapsedSeconds)}
-                    </span>
+                <div className="order-header-top">
+                    <div className="order-card-title">
+                        <span className="order-table">Table {order.tableNumber}</span>
+                        <span className="order-id">#{order.id.slice(-5).toUpperCase()}</span>
+                    </div>
                     <span
                         className="order-status-badge"
                         style={{ background: statusColors[order.status] || '#6b7280' }}
                     >
                         {statusLabels[order.status] || order.status}
+                    </span>
+                </div>
+                <div className="order-header-bottom">
+                    <span className={`order-timer-badge ${getTimerUrgencyClass(elapsedSeconds, order.status)}`}>
+                        ⏱️ {order.status === 'served' ? `Served in ${formatTimer(elapsedSeconds)}` : `Elapsed: ${formatTimer(elapsedSeconds)}`}
                     </span>
                 </div>
             </div>
