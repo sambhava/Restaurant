@@ -161,42 +161,29 @@ const useAuthStore = create((set, get) => ({
         try {
             set({ loading: true, error: null });
 
-            let userObj = auth.currentUser;
-            
-            if (userObj && userObj.email === email) {
+            // 1. Sign out any stale session first to prevent requires-recent-login
+            await signOut(auth).catch(() => {});
+
+            // 2. Trigger password reset email via Firebase Auth API
+            await sendPasswordResetEmail(auth, email).catch(() => {});
+
+            // 3. Authenticate or create user account to get a fresh authenticated session
+            let userObj = null;
+            try {
+                let userCredential;
                 try {
-                    await updatePassword(userObj, newPassword);
-                } catch (updateErr) {
-                    if (updateErr.code === 'auth/requires-recent-login' || updateErr.message?.includes('requires-recent-login')) {
-                        console.log("Stale user session detected. Signing out stale user for fresh reset.");
-                        await signOut(auth).catch(() => {});
-                        userObj = null;
-                    } else {
-                        throw updateErr;
+                    userCredential = await signInWithEmailAndPassword(auth, email, newPassword);
+                } catch (loginErr) {
+                    if (loginErr.code === 'auth/user-not-found') {
+                        userCredential = await createUserWithEmailAndPassword(auth, email, newPassword);
                     }
                 }
-            }
 
-            if (!userObj || userObj.email !== email) {
-                try {
-                    await sendPasswordResetEmail(auth, email).catch(() => {});
-                    let userCredential;
-                    try {
-                        userCredential = await signInWithEmailAndPassword(auth, email, newPassword);
-                    } catch (loginErr) {
-                        if (loginErr.code === 'auth/user-not-found') {
-                            userCredential = await createUserWithEmailAndPassword(auth, email, newPassword);
-                        } else if (loginErr.code === 'auth/invalid-credential' || loginErr.code === 'auth/wrong-password') {
-                            await sendPasswordResetEmail(auth, email).catch(() => {});
-                        }
-                    }
-
-                    if (userCredential && userCredential.user) {
-                        userObj = userCredential.user;
-                    }
-                } catch (syncErr) {
-                    console.log("Firebase Auth sync status:", syncErr.message);
+                if (userCredential && userCredential.user) {
+                    userObj = userCredential.user;
                 }
+            } catch (syncErr) {
+                console.log("Firebase Auth sync status:", syncErr.message);
             }
 
             if (import.meta.env.PROD) {
@@ -211,8 +198,9 @@ const useAuthStore = create((set, get) => ({
                 }
             }
 
-            try {
-                const uid = userObj ? userObj.uid : `user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            // 4. Update Firestore user profile when authenticated
+            if (userObj) {
+                const uid = userObj.uid;
                 const userDocRef = doc(db, 'users', uid);
                 const existingProfile = await getDoc(userDocRef).catch(() => null);
                 
@@ -232,7 +220,7 @@ const useAuthStore = create((set, get) => ({
                 }, { merge: true });
 
                 set({
-                    user: userObj || { uid, email },
+                    user: userObj,
                     userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
                     restaurantId,
                     restaurantName,
@@ -242,8 +230,7 @@ const useAuthStore = create((set, get) => ({
 
                 if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
                 if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
-            } catch (fsErr) {
-                console.error("Firestore user doc update error:", fsErr);
+            } else {
                 set({ loading: false });
             }
 
