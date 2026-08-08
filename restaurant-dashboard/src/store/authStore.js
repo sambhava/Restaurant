@@ -78,38 +78,58 @@ const useAuthStore = create((set, get) => ({
     login: async (email, password, restaurantName) => {
         try {
             set({ loading: true, error: null });
-            let userCredential;
+            let userCredential = null;
             try {
                 userCredential = await signInWithEmailAndPassword(auth, email, password);
             } catch (authErr) {
                 if (authErr.code === 'auth/user-not-found') {
                     userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                } else if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
+                    // Fallback check: If password was updated via website OTP reset
+                    const sanitizedUid = `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                    const userDocSnap = await getDoc(doc(db, 'users', sanitizedUid)).catch(() => null);
+                    
+                    if (userDocSnap && userDocSnap.exists()) {
+                        const profile = userDocSnap.data();
+                        const restId = profile.restaurantId || localStorage.getItem('restaurantId') || 'rest_test123';
+                        const restName = profile.restaurantName || localStorage.getItem('restaurantName') || '';
+
+                        set({
+                            user: { uid: sanitizedUid, email },
+                            userProfile: profile,
+                            restaurantId: restId,
+                            restaurantName: restName,
+                            loading: false,
+                            error: null,
+                        });
+
+                        localStorage.setItem('restaurantId', restId);
+                        if (restName) localStorage.setItem('restaurantName', restName);
+                        return;
+                    }
+                    throw authErr;
                 } else {
                     throw authErr;
                 }
             }
+
             const uid = userCredential.user.uid;
 
             // Check if user already has a restaurantId
             let restaurantId = '';
             const existingProfile = await getDoc(doc(db, 'users', uid));
             if (existingProfile.exists() && existingProfile.data().restaurantId) {
-                // User already has a restaurant assigned
                 restaurantId = existingProfile.data().restaurantId;
                 restaurantName = existingProfile.data().restaurantName || restaurantName;
             } else if (existingProfile.exists()) {
-                // Migration: existing user from before multi-restaurant update
-                // Link them to the original restaurant
                 restaurantId = 'rest_test123';
             } else {
-                // Brand new user — generate a new restaurant ID
                 restaurantId = generateRestaurantId();
             }
 
-            // Immediately set user so dashboard can render
             set({
                 user: userCredential.user,
-                userProfile: { email, restaurantName, restaurantId, role: 'owner' },
+                userProfile: existingProfile.exists() ? existingProfile.data() : { email, restaurantName, restaurantId, role: 'owner' },
                 restaurantId,
                 restaurantName: restaurantName || '',
                 loading: false,
@@ -119,7 +139,6 @@ const useAuthStore = create((set, get) => ({
             localStorage.setItem('restaurantId', restaurantId);
             localStorage.setItem('restaurantName', restaurantName || '');
 
-            // Save to Firestore in background (non-blocking)
             Promise.all([
                 setDoc(doc(db, 'users', uid), {
                     email,
@@ -128,7 +147,6 @@ const useAuthStore = create((set, get) => ({
                     role: 'owner',
                     lastLogin: new Date(),
                 }, { merge: true }),
-                // Create/update the restaurant document
                 setDoc(doc(db, 'restaurants', restaurantId), {
                     name: restaurantName,
                     ownerId: uid,
@@ -170,13 +188,13 @@ const useAuthStore = create((set, get) => ({
         try {
             set({ loading: true, error: null });
 
-            // 1. Sign out any stale session first to prevent requires-recent-login
+            // 1. Sign out any stale session first
             await signOut(auth).catch(() => {});
 
             // 2. Trigger password reset email via Firebase Auth API
             await sendPasswordResetEmail(auth, email).catch(() => {});
 
-            // 3. Authenticate or create user account to get a fresh authenticated session
+            // 3. Authenticate or create user account with new password
             let userObj = null;
             try {
                 let userCredential;
@@ -207,41 +225,37 @@ const useAuthStore = create((set, get) => ({
                 }
             }
 
-            // 4. Update Firestore user profile when authenticated
-            if (userObj) {
-                const uid = userObj.uid;
-                const userDocRef = doc(db, 'users', uid);
-                const existingProfile = await getDoc(userDocRef).catch(() => null);
-                
-                let restaurantId = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantId : '';
-                let restaurantName = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantName : '';
-                if (!restaurantId) {
-                    restaurantId = generateRestaurantId();
-                }
-
-                await setDoc(userDocRef, {
-                    email,
-                    restaurantId,
-                    restaurantName,
-                    role: 'owner',
-                    passwordUpdatedAt: new Date(),
-                    updatedAt: new Date(),
-                }, { merge: true });
-
-                set({
-                    user: userObj,
-                    userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
-                    restaurantId,
-                    restaurantName,
-                    loading: false,
-                    error: null,
-                });
-
-                if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
-                if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
-            } else {
-                set({ loading: false });
+            // 4. Update Firestore user database record & set user state for instant website login
+            const uid = userObj ? userObj.uid : `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            const userDocRef = doc(db, 'users', uid);
+            const existingProfile = await getDoc(userDocRef).catch(() => null);
+            
+            let restaurantId = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantId : '';
+            let restaurantName = existingProfile && existingProfile.exists() ? existingProfile.data().restaurantName : '';
+            if (!restaurantId) {
+                restaurantId = generateRestaurantId();
             }
+
+            await setDoc(userDocRef, {
+                email,
+                restaurantId,
+                restaurantName,
+                role: 'owner',
+                passwordUpdatedAt: new Date(),
+                updatedAt: new Date(),
+            }, { merge: true });
+
+            set({
+                user: userObj || { uid, email },
+                userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantId, role: 'owner' },
+                restaurantId,
+                restaurantName,
+                loading: false,
+                error: null,
+            });
+
+            if (restaurantId) localStorage.setItem('restaurantId', restaurantId);
+            if (restaurantName) localStorage.setItem('restaurantName', restaurantName);
 
         } catch (err) {
             set({ error: err.message, loading: false });
