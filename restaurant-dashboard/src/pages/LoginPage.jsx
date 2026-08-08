@@ -138,8 +138,11 @@ export default function LoginPage() {
 
         try {
             await updateForgotPasswordInDb(email, newPassword);
-            setResetSuccess('Password updated successfully in database! Redirecting...');
-            setTimeout(() => navigate('/dashboard/orders'), 1200);
+            setResetSuccess('Password reset request processed! Redirecting to Sign In...');
+            setTimeout(() => {
+                setStep('credentials');
+                setResetSuccess('');
+            }, 1800);
         } catch (err) {
             setCustomError(err.message || "Could not update password in database.");
         }
