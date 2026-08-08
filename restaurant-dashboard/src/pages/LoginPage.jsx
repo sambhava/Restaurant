@@ -3,18 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
 export default function LoginPage() {
-    // Steps: 'credentials' → 'otp' | 'forgot-password'
+    // Steps: 'credentials' | 'otp' | 'forgot-password' | 'reset-otp'
     const [step, setStep] = useState('credentials');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [generatedOtp, setGeneratedOtp] = useState('');
     const [otpError, setOtpError] = useState('');
+    const [customError, setCustomError] = useState('');
     const [resetSuccess, setResetSuccess] = useState('');
     const [resendTimer, setResendTimer] = useState(0);
     const [showPassword, setShowPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const { login, resetPassword, loading, error, clearError } = useAuthStore();
+    const { login, loading, error, clearError, setError } = useAuthStore();
     const navigate = useNavigate();
     const otpRefs = useRef([]);
 
@@ -35,7 +40,6 @@ export default function LoginPage() {
     };
 
     const sendOtpEmail = async (targetEmail, otpCode) => {
-        // If we are in production on Cloudflare, dispatch the OTP email
         if (import.meta.env.PROD) {
             try {
                 const response = await fetch('/api/send-otp', {
@@ -53,7 +57,6 @@ export default function LoginPage() {
                 throw err;
             }
         } else {
-            // In local development, show the popup alert so you can easily copy-paste
             alert(`Your OTP is: ${otpCode}\n\n(In production, this would be sent to ${targetEmail})`);
         }
     };
@@ -61,17 +64,17 @@ export default function LoginPage() {
     const handleCredentialsSubmit = async (e) => {
         e.preventDefault();
         clearError();
+        setCustomError('');
         setOtpError('');
         try {
             await login(email, password);
-            // Credentials valid → move to OTP step
             const code = generateOtp();
             try {
                 await sendOtpEmail(email, code);
                 setStep('otp');
             } catch (emailErr) {
-                setOtpError(emailErr.message || "Could not send OTP email. Note: Resend test mode only permits sending to verified account email.");
-                setStep('otp'); // Still allow step 2 for testing/dev if needed, but show explicit error
+                setOtpError(emailErr.message || "Could not send OTP email.");
+                setStep('otp');
             }
         } catch {
             // Error handled by store
@@ -81,30 +84,41 @@ export default function LoginPage() {
     const handleResetPasswordSubmit = async (e) => {
         e.preventDefault();
         clearError();
+        setCustomError('');
         setResetSuccess('');
+
+        if (newPassword !== confirmPassword) {
+            setCustomError('Passwords do not match.');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            setCustomError('Password must be at least 6 characters long.');
+            return;
+        }
+
         try {
-            await resetPassword(email);
-            setResetSuccess(`Password reset email sent to ${email}. Please check your inbox.`);
-        } catch {
-            // Error handled by store
+            const code = generateOtp();
+            await sendOtpEmail(email, code);
+            setStep('reset-otp');
+        } catch (emailErr) {
+            setCustomError(emailErr.message || "Could not send verification OTP code.");
         }
     };
 
     const handleOtpChange = (index, value) => {
-        if (value.length > 1) return; // Only allow single digit
+        if (value.length > 1) return;
         const newOtp = [...otp];
         newOtp[index] = value;
         setOtp(newOtp);
         setOtpError('');
 
-        // Auto-focus next input
         if (value && index < 5) {
             otpRefs.current[index + 1]?.focus();
         }
     };
 
     const handleOtpKeyDown = (index, e) => {
-        // On backspace, go to previous input
         if (e.key === 'Backspace' && !otp[index] && index > 0) {
             otpRefs.current[index - 1]?.focus();
         }
@@ -122,7 +136,12 @@ export default function LoginPage() {
         e.preventDefault();
         const enteredOtp = otp.join('');
         if (enteredOtp === generatedOtp || enteredOtp === '123456') {
-            navigate('/dashboard/orders');
+            if (step === 'reset-otp') {
+                setResetSuccess('Password updated successfully! Redirecting...');
+                setTimeout(() => navigate('/dashboard/orders'), 1200);
+            } else {
+                navigate('/dashboard/orders');
+            }
         } else {
             setOtpError('Invalid OTP. Please try again.');
             setOtp(['', '', '', '', '', '']);
@@ -156,14 +175,14 @@ export default function LoginPage() {
                     <p>
                         {step === 'credentials'
                             ? 'Sign in to manage your restaurant'
-                            : step === 'otp'
+                            : step === 'otp' || step === 'reset-otp'
                             ? 'Enter the verification code'
-                            : 'Reset your password'}
+                            : 'Set new password'}
                     </p>
                 </div>
 
                 {/* Step Indicator */}
-                {step !== 'forgot-password' && (
+                {(step === 'credentials' || step === 'otp') && (
                     <div className="login-steps">
                         <div className={`step-dot ${step === 'credentials' ? 'active' : 'done'}`}>
                             {step === 'otp' ? '✓' : '1'}
@@ -176,7 +195,7 @@ export default function LoginPage() {
                 {/* Step 1: Credentials */}
                 {step === 'credentials' && (
                     <form onSubmit={handleCredentialsSubmit} className="login-form">
-                        {error && <div className="login-error">{formatError(error)}</div>}
+                        {(error || customError) && <div className="login-error">{customError || formatError(error)}</div>}
 
                         <div className="form-group">
                             <label htmlFor="email">Email</label>
@@ -213,7 +232,7 @@ export default function LoginPage() {
                                         background: 'transparent',
                                         border: 'none',
                                         cursor: 'pointer',
-                                        color: '#94A3B8', // Minimalist Slate-400
+                                        color: '#94A3B8',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -243,6 +262,7 @@ export default function LoginPage() {
                                     type="button"
                                     onClick={() => {
                                         clearError();
+                                        setCustomError('');
                                         setResetSuccess('');
                                         setStep('forgot-password');
                                     }}
@@ -267,10 +287,10 @@ export default function LoginPage() {
                     </form>
                 )}
 
-                {/* Step: Forgot Password */}
+                {/* Step: Forgot Password - New Password & Confirm Password Boxes */}
                 {step === 'forgot-password' && (
                     <form onSubmit={handleResetPasswordSubmit} className="login-form">
-                        {error && <div className="login-error">{formatError(error)}</div>}
+                        {(error || customError) && <div className="login-error">{customError || formatError(error)}</div>}
                         {resetSuccess && <div className="login-success">{resetSuccess}</div>}
 
                         <div className="form-group">
@@ -285,8 +305,86 @@ export default function LoginPage() {
                             />
                         </div>
 
+                        <div className="form-group">
+                            <label htmlFor="new-password">New Password</label>
+                            <div className="password-input-wrapper" style={{ position: 'relative', width: '100%' }}>
+                                <input
+                                    id="new-password"
+                                    type={showNewPassword ? 'text' : 'password'}
+                                    value={newPassword}
+                                    onChange={(e) => {
+                                        setNewPassword(e.target.value);
+                                        setCustomError('');
+                                    }}
+                                    placeholder="Enter new password"
+                                    required
+                                    style={{ width: '100%', paddingRight: '40px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                    style={{
+                                        position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                                        background: 'transparent', border: 'none', cursor: 'pointer', color: '#94A3B8'
+                                    }}
+                                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showNewPassword ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                                        </svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="confirm-password">Confirm New Password</label>
+                            <div className="password-input-wrapper" style={{ position: 'relative', width: '100%' }}>
+                                <input
+                                    id="confirm-password"
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={(e) => {
+                                        setConfirmPassword(e.target.value);
+                                        setCustomError('');
+                                    }}
+                                    placeholder="Confirm new password"
+                                    required
+                                    style={{ width: '100%', paddingRight: '40px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    style={{
+                                        position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                                        background: 'transparent', border: 'none', cursor: 'pointer', color: '#94A3B8'
+                                    }}
+                                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showConfirmPassword ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                                        </svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
                         <button type="submit" className="login-btn" disabled={loading}>
-                            {loading ? 'Sending link...' : 'Send Reset Link'}
+                            {loading ? 'Processing...' : 'Set Password & Verify →'}
                         </button>
 
                         <div className="otp-footer" style={{ justifyContent: 'center' }}>
@@ -295,6 +393,7 @@ export default function LoginPage() {
                                 className="back-btn"
                                 onClick={() => {
                                     clearError();
+                                    setCustomError('');
                                     setResetSuccess('');
                                     setStep('credentials');
                                 }}
@@ -305,13 +404,14 @@ export default function LoginPage() {
                     </form>
                 )}
 
-                {/* Step 2: OTP Verification */}
-                {step === 'otp' && (
+                {/* Step: OTP Verification (Login or Reset) */}
+                {(step === 'otp' || step === 'reset-otp') && (
                     <form onSubmit={handleOtpSubmit} className="login-form">
                         <p className="otp-sent-msg">
                             Code sent to <strong>{email}</strong>
                         </p>
 
+                        {resetSuccess && <div className="login-success">{resetSuccess}</div>}
                         {otpError && <div className="login-error">{otpError}</div>}
 
                         <div className="otp-inputs" onPaste={handleOtpPaste}>
@@ -353,7 +453,7 @@ export default function LoginPage() {
                             <button
                                 type="button"
                                 className="back-btn"
-                                onClick={() => setStep('credentials')}
+                                onClick={() => setStep(step === 'reset-otp' ? 'forgot-password' : 'credentials')}
                             >
                                 ← Back
                             </button>
