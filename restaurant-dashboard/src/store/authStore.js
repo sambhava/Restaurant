@@ -246,13 +246,17 @@ const useAuthStore = create((set, get) => ({
             set({ loading: true, error: null });
             const cleanEmail = email.trim().toLowerCase();
 
-            // 1. Update the master active password in Firestore users_auth collection
-            const userAuthRef = doc(db, 'users_auth', cleanEmail);
-            await setDoc(userAuthRef, {
-                email: cleanEmail,
-                password: newPassword,
-                updatedAt: new Date(),
-            }, { merge: true });
+            // 1. Update the master active password in Firestore users_auth collection safely
+            try {
+                const userAuthRef = doc(db, 'users_auth', cleanEmail);
+                await setDoc(userAuthRef, {
+                    email: cleanEmail,
+                    password: newPassword,
+                    updatedAt: new Date(),
+                }, { merge: true });
+            } catch (err) {
+                console.warn('Could not save user_auth doc on password reset:', err);
+            }
 
             // 2. Try updating in Firebase Auth if current user is logged in
             let userObj = auth.currentUser;
