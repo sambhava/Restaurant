@@ -29,19 +29,6 @@ export default function MenuItem({ item, isBestseller }) {
         }
     };
 
-    // Generate a pseudo-random rating between 4.0 and 5.0 based on item name
-    const getRating = (name) => {
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return 4.0 + (Math.abs(hash) % 10) / 10;
-    };
-
-    const rating = getRating(item.name);
-    const fullStars = Math.floor(rating);
-    const hasHalf = rating - fullStars >= 0.5;
-
     return (
         <>
             <div className={`menu-item-card ${isBestseller ? 'bestseller' : ''}`}>
@@ -65,10 +52,6 @@ export default function MenuItem({ item, isBestseller }) {
 
                     <div className="menu-item-price-row">
                         <span className="menu-item-price">₹{item.price}</span>
-                        <div className="menu-item-rating">
-                            <span className="star">★</span>
-                            <span className="rating-value">{rating.toFixed(1)}</span>
-                        </div>
                     </div>
 
                     {item.description && (
