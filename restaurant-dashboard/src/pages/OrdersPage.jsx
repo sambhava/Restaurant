@@ -56,29 +56,36 @@ export default function OrdersPage() {
         const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
         const q = query(ordersRef, orderBy('orderedAt', 'desc'));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const orderData = snapshot.docs
-                .map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }))
-                .filter((order) => order.status !== 'closed');
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const orderData = snapshot.docs
+                    .map((doc) => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    }))
+                    .filter((order) => order.status !== 'closed');
 
-            // Detect new orders (only after initial load)
-            if (prevOrderCountRef.current !== null) {
-                const newCount = orderData.filter(o => o.status === 'pending').length;
-                const prevCount = prevOrderCountRef.current;
-                if (newCount > prevCount) {
-                    const diff = newCount - prevCount;
-                    playNotificationSound();
-                    showToast(`🔔 ${diff} new order${diff > 1 ? 's' : ''} received!`);
+                // Detect new orders (only after initial load)
+                if (prevOrderCountRef.current !== null) {
+                    const newCount = orderData.filter((o) => o.status === 'pending').length;
+                    const prevCount = prevOrderCountRef.current;
+                    if (newCount > prevCount) {
+                        const diff = newCount - prevCount;
+                        playNotificationSound();
+                        showToast(`🔔 ${diff} new order${diff > 1 ? 's' : ''} received!`);
+                    }
                 }
-            }
-            prevOrderCountRef.current = orderData.filter(o => o.status === 'pending').length;
+                prevOrderCountRef.current = orderData.filter((o) => o.status === 'pending').length;
 
-            setOrders(orderData);
-            setLoading(false);
-        });
+                setOrders(orderData);
+                setLoading(false);
+            },
+            (error) => {
+                console.error('Error fetching live orders:', error);
+                setLoading(false);
+            }
+        );
 
         return () => unsubscribe();
     }, [restaurantId, showToast]);

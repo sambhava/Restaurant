@@ -100,7 +100,10 @@ export default function TablesPage() {
         loadTableCount();
 
         // Real-time listener for sessions
-        if (!restaurantId) return;
+        if (!restaurantId) {
+            setLoading(false);
+            return;
+        }
         const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
         const q = query(sessionsRef, where('status', '==', 'active'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -113,6 +116,7 @@ export default function TablesPage() {
             setLoading(false);
         }, (error) => {
             console.error("Error listening to sessions:", error);
+            setLoading(false);
         });
 
         return () => unsubscribe();

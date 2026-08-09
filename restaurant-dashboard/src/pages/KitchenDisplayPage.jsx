@@ -40,6 +40,8 @@ export default function KitchenDisplayPage() {
             }
             prevCountRef.current = data.length;
             setOrders(data);
+        }, (error) => {
+            console.error("Error listening to KDS orders:", error);
         });
         return () => unsubscribe();
     }, [restaurantId]);
