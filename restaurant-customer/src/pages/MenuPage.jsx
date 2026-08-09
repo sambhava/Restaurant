@@ -242,9 +242,28 @@ export default function MenuPage() {
                     }}
                 >
                     <div className="splash-content">
-                        <span className="splash-emoji">🍽️</span>
+                        {restaurantInfo?.logoUrl || restaurantInfo?.logo || restaurantInfo?.branding?.logo ? (
+                            <img
+                                src={restaurantInfo.logoUrl || restaurantInfo.logo || restaurantInfo.branding?.logo}
+                                alt={restaurantInfo?.name || 'Restaurant Logo'}
+                                className="splash-logo"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = '/logo.jpg';
+                                }}
+                            />
+                        ) : (
+                            <img
+                                src="/logo.jpg"
+                                alt="Restaurant Logo"
+                                className="splash-logo"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        )}
                         <h1 className="splash-title">Welcome to</h1>
-                        <h2 className="splash-restaurant">{restaurantInfo?.name || 'our Restaurant'}</h2>
+                        <h2 className="splash-restaurant">{restaurantInfo?.name || 'Pinch Of Salt'}</h2>
                         <p className="splash-subtitle">Happy Dining!</p>
                         <div className="splash-sparkles">✨✨✨</div>
                     </div>
