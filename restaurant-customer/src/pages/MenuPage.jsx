@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs, query, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import useMenu from '../hooks/useMenu';
 import useSession from '../hooks/useSession';
@@ -10,7 +10,6 @@ import CartButton from '../components/CartButton';
 import ActiveOrders from '../components/ActiveOrders';
 import ThemeToggle from '../components/ThemeToggle';
 import SkeletonCard from '../components/SkeletonCard';
-import { getRestaurantInfo } from '../services/orderService';
 import { getOrderParams } from '../utils/urlParser';
 
 export default function MenuPage() {
@@ -36,15 +35,15 @@ export default function MenuPage() {
     }, [restaurantId, tableNumber, setOrderContext]);
 
     useEffect(() => {
-        async function fetchInfo() {
-            try {
-                const info = await getRestaurantInfo(restaurantId);
-                setRestaurantInfo(info);
-            } catch {
-                // Silently fail — header will show fallback
+        if (!restaurantId) return;
+        const docRef = doc(db, 'restaurants', restaurantId);
+        const unsubscribe = onSnapshot(docRef, (snap) => {
+            if (snap.exists()) {
+                setRestaurantInfo({ id: snap.id, ...snap.data() });
             }
-        }
-        fetchInfo();
+        }, (err) => console.error('Error listening to restaurant info:', err));
+
+        return () => unsubscribe();
     }, [restaurantId]);
 
     // Find the top 5 bestseller items by counting order frequency
@@ -98,14 +97,22 @@ export default function MenuPage() {
         if (searchTerm.trim()) {
             const lowerTerm = searchTerm.toLowerCase();
             base = base.filter(item => item.name.toLowerCase().includes(lowerTerm));
-        } else if (activeCategory !== 'all') {
-            // Otherwise filter by category
-            base = base.filter((item) => item.category === activeCategory);
+            return base;
+        }
+
+        if (activeCategory === 'bestsellers') {
+            return base.filter((item) => bestsellerItemIds.includes(item.id));
+        }
+
+        if (activeCategory !== 'all') {
+            base = base.filter(
+                (item) => item.category?.toLowerCase() === activeCategory.toLowerCase()
+            );
         }
 
         if (bestsellerItemIds.length === 0) return base;
 
-        // Put bestsellers first, preserving their relative order
+        // Sort: bestsellers first within category
         return [...base].sort((a, b) => {
             const aIdx = bestsellerItemIds.indexOf(a.id);
             const bIdx = bestsellerItemIds.indexOf(b.id);
@@ -127,6 +134,74 @@ export default function MenuPage() {
                 <p style={{ fontSize: '13px', color: 'var(--clr-text-muted)', marginTop: '8px' }}>
                     Please scan the QR code on your table to place an order.
                 </p>
+            </div>
+        );
+    }
+
+    if (restaurantInfo && restaurantInfo.isOpen === false) {
+        const restName = restaurantInfo.name || restaurantInfo.restaurantName || 'Restaurant';
+        return (
+            <div className="restaurant-closed-screen" style={{
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '32px 24px',
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+                <div style={{
+                    width: '90px',
+                    height: '90px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FEE2E2',
+                    color: '#EF4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '42px',
+                    marginBottom: '20px',
+                    boxShadow: '0 10px 25px rgba(239, 68, 68, 0.25)'
+                }}>
+                    🔒
+                </div>
+                <span style={{
+                    display: 'inline-block',
+                    padding: '6px 16px',
+                    borderRadius: '20px',
+                    backgroundColor: '#FEE2E2',
+                    color: '#991B1B',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase',
+                    marginBottom: '14px'
+                }}>
+                    CLOSED
+                </span>
+                <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', marginBottom: '12px', lineHeight: 1.2 }}>
+                    {restName} is Closed
+                </h1>
+                <p style={{ color: '#64748B', maxWidth: '380px', fontSize: '15px', lineHeight: 1.6, marginBottom: '28px' }}>
+                    We are currently not accepting orders. QR code menus and table ordering are temporarily disabled. Please check back during operating hours!
+                </p>
+                <div style={{
+                    padding: '14px 20px',
+                    borderRadius: '12px',
+                    background: '#ffffff',
+                    border: '1px solid #E2E8F0',
+                    fontSize: '13px',
+                    color: '#475569',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.04)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                }}>
+                    <span>💡</span>
+                    <span>If you are currently at a table, please speak to restaurant staff.</span>
+                </div>
             </div>
         );
     }

@@ -17,6 +17,14 @@ export async function submitOrder(
     cartItems,
     specialInstructions = ''
 ) {
+    // Check if restaurant is open before placing order
+    const restDocRef = doc(db, 'restaurants', restaurantId);
+    const restDocSnap = await getDoc(restDocRef);
+    if (restDocSnap.exists() && restDocSnap.data().isOpen === false) {
+        const restName = restDocSnap.data().name || 'Restaurant';
+        throw new Error(`${restName} is currently closed. Orders cannot be placed.`);
+    }
+
     // Get or create a session for this table
     const session = await getOrCreateSession(restaurantId, tableNumber);
 
