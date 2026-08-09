@@ -113,42 +113,59 @@ const useAuthStore = create((set, get) => ({
         });
     },
 
-    login: async (email, password, restaurantName) => {
+    login: async (email, password) => {
         try {
             set({ loading: true, error: null });
+            const cleanEmail = email.trim().toLowerCase();
             let userCredential = null;
+            let authenticatedWithFirebase = false;
 
+            // 1. Try signing in via Firebase Auth first
             try {
-                userCredential = await signInWithEmailAndPassword(auth, email, password);
+                userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+                authenticatedWithFirebase = true;
             } catch (authErr) {
                 if (authErr.code === 'auth/user-not-found') {
-                    userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                } else if (authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
-                    // Website fallback login for password reset users
-                    const restId = (email === 'sambhavajain512@gmail.com') ? 'rest-2' : (localStorage.getItem('restaurantId') || 'rest-2');
-                    const restName = (email === 'sambhavajain512@gmail.com') ? 'Pinch Of Salt' : (localStorage.getItem('restaurantName') || 'Pinch Of Salt');
-                    
-                    const userObj = { uid: `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`, email };
-
-                    set({
-                        user: userObj,
-                        userProfile: { email, restaurantId: restId, restaurantName: restName, role: 'owner' },
-                        restaurantId: restId,
-                        restaurantName: restName,
-                        loading: false,
-                        error: null,
-                    });
-
-                    localStorage.setItem('authUser', JSON.stringify(userObj));
-                    localStorage.setItem('restaurantId', restId);
-                    localStorage.setItem('restaurantName', restName);
-                    return;
-                } else {
-                    throw authErr;
+                    try {
+                        userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+                        authenticatedWithFirebase = true;
+                    } catch (createErr) {
+                        // Email exists or invalid
+                    }
                 }
             }
 
-            const uid = userCredential.user.uid;
+            // 2. Fetch stored user_auth credential document from Firestore
+            const userAuthRef = doc(db, 'users_auth', cleanEmail);
+            let userAuthSnap = null;
+            try {
+                userAuthSnap = await getDoc(userAuthRef);
+            } catch (err) {
+                console.warn('Could not fetch user_auth doc:', err);
+            }
+
+            if (userAuthSnap && userAuthSnap.exists()) {
+                const storedPassword = userAuthSnap.data().password;
+                if (storedPassword && storedPassword !== password) {
+                    // Password mismatch -> REJECT old/wrong password
+                    throw new Error('Incorrect password. If you recently reset your password, please enter your new password.');
+                }
+            } else if (!authenticatedWithFirebase && !userCredential) {
+                throw new Error('Invalid email or password. Please check your credentials or reset your password.');
+            }
+
+            // Save/sync current active password to users_auth
+            try {
+                await setDoc(userAuthRef, {
+                    email: cleanEmail,
+                    password: password,
+                    updatedAt: new Date(),
+                }, { merge: true });
+            } catch (err) {
+                console.warn('Could not save user_auth doc:', err);
+            }
+
+            const uid = userCredential?.user?.uid || `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
             let restaurantId = 'rest-2';
             let rName = 'Pinch Of Salt';
 
@@ -163,11 +180,11 @@ const useAuthStore = create((set, get) => ({
                 rName = 'Pinch Of Salt';
             }
 
-            const userObj = { uid: userCredential.user.uid, email: userCredential.user.email };
+            const userObj = { uid, email: cleanEmail };
 
             set({
                 user: userObj,
-                userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email, restaurantName: rName, restaurantId, role: 'owner' },
+                userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email: cleanEmail, restaurantName: rName, restaurantId, role: 'owner' },
                 restaurantId,
                 restaurantName: rName,
                 loading: false,
@@ -180,7 +197,7 @@ const useAuthStore = create((set, get) => ({
 
             Promise.all([
                 setDoc(doc(db, 'users', uid), {
-                    email,
+                    email: cleanEmail,
                     restaurantName: rName,
                     restaurantId,
                     role: 'owner',
@@ -216,7 +233,7 @@ const useAuthStore = create((set, get) => ({
     resetPassword: async (email) => {
         try {
             set({ loading: true, error: null });
-            await sendPasswordResetEmail(auth, email);
+            await sendPasswordResetEmail(auth, email.trim().toLowerCase());
             set({ loading: false });
         } catch (err) {
             set({ error: err.message, loading: false });
@@ -227,40 +244,32 @@ const useAuthStore = create((set, get) => ({
     updateForgotPasswordInDb: async (email, newPassword) => {
         try {
             set({ loading: true, error: null });
+            const cleanEmail = email.trim().toLowerCase();
 
-            // 1. Send password reset email trigger in background
-            sendPasswordResetEmail(auth, email).catch(() => {});
+            // 1. Update the master active password in Firestore users_auth collection
+            const userAuthRef = doc(db, 'users_auth', cleanEmail);
+            await setDoc(userAuthRef, {
+                email: cleanEmail,
+                password: newPassword,
+                updatedAt: new Date(),
+            }, { merge: true });
 
-            // 2. Try registering or updating user in Firebase Auth
+            // 2. Try updating in Firebase Auth if current user is logged in
             let userObj = auth.currentUser;
-            if (!userObj) {
-                try {
-                    const cred = await createUserWithEmailAndPassword(auth, email, newPassword);
-                    userObj = cred.user;
-                } catch (createErr) {
-                    if (createErr.code === 'auth/email-already-in-use') {
-                        try {
-                            const cred = await signInWithEmailAndPassword(auth, email, newPassword);
-                            userObj = cred.user;
-                        } catch (loginErr) {
-                            console.log("Firebase Auth signin note:", loginErr.message);
-                        }
-                    }
-                }
-            }
-
             if (userObj) {
                 await updatePassword(userObj, newPassword).catch(() => {});
+            } else {
+                sendPasswordResetEmail(auth, cleanEmail).catch(() => {});
             }
 
-            const restId = (email === 'sambhavajain512@gmail.com') ? 'rest-2' : (localStorage.getItem('restaurantId') || 'rest-2');
-            const restName = (email === 'sambhavajain512@gmail.com') ? 'Pinch Of Salt' : (localStorage.getItem('restaurantName') || 'Pinch Of Salt');
-            const fallbackUid = userObj ? userObj.uid : `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-            const activeUser = userObj ? { uid: userObj.uid, email: userObj.email } : { uid: fallbackUid, email };
+            const restId = (cleanEmail === 'sambhavajain512@gmail.com') ? 'rest-2' : (localStorage.getItem('restaurantId') || 'rest-2');
+            const restName = (cleanEmail === 'sambhavajain512@gmail.com') ? 'Pinch Of Salt' : (localStorage.getItem('restaurantName') || 'Pinch Of Salt');
+            const fallbackUid = userObj ? userObj.uid : `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+            const activeUser = userObj ? { uid: userObj.uid, email: userObj.email } : { uid: fallbackUid, email: cleanEmail };
 
             set({
                 user: activeUser,
-                userProfile: { email, restaurantId: restId, restaurantName: restName, role: 'owner' },
+                userProfile: { email: cleanEmail, restaurantId: restId, restaurantName: restName, role: 'owner' },
                 restaurantId: restId,
                 restaurantName: restName,
                 loading: false,
