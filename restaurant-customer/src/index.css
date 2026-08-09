@@ -453,14 +453,21 @@ button {
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  padding: 20px 16px;
+  gap: 12px;
+  padding: 12px 14px 90px;
 }
 
-@media (max-width: 420px) {
+@media (min-width: 640px) {
   .menu-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 960px) {
+  .menu-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
   }
 }
 
@@ -822,36 +829,64 @@ button {
   to { transform: translateY(0); opacity: 1; }
 }
 
-.cart-button {
+.cart-bar-container {
   width: 100%;
   max-width: 580px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 22px;
-  background: linear-gradient(135deg, #E8A54B 0%, #D4932F 100%);
-  border: none;
-  border-radius: var(--radius-lg);
-  color: #fff;
+  padding: 12px 18px;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   cursor: pointer;
-  box-shadow: 0 6px 28px rgba(232, 165, 75, 0.35);
-  transition: all var(--transition);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.cart-button:hover {
+.cart-bar-container:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 36px rgba(232, 165, 75, 0.45);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.16);
 }
 
-.cart-button:active {
-  transform: scale(0.98);
+.cart-bar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.cart-button-left,
-.cart-button-right {
+.cart-bar-count {
+  font-size: 12px;
+  color: var(--clr-text-muted);
+  font-weight: 500;
+}
+
+.cart-bar-total {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--clr-text);
+  line-height: 1.1;
+}
+
+.cart-bar-checkout-btn {
+  background: linear-gradient(135deg, #FF6B4A 0%, #FF522B 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 82, 43, 0.35);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.cart-bar-checkout-btn:hover {
+  background: linear-gradient(135deg, #FF522B 0%, #E03E1A 100%);
+  transform: translateY(-1px);
 }
 
 .cart-badge {

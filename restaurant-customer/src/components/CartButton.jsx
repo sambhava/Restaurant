@@ -9,18 +9,15 @@ export default function CartButton() {
 
     return (
         <div className="cart-button-wrapper">
-            <button className="cart-button" onClick={() => navigate('/cart')}>
-                <div className="cart-button-left">
-                    <span className="cart-badge">{itemCount}</span>
-                    <span className="cart-label">
-                        {itemCount === 1 ? '1 item' : `${itemCount} items`}
-                    </span>
+            <div className="cart-bar-container" onClick={() => navigate('/cart')}>
+                <div className="cart-bar-left">
+                    <span className="cart-bar-count">Total: {itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+                    <span className="cart-bar-total">₹{total.toFixed(0)}</span>
                 </div>
-                <div className="cart-button-right">
-                    <span className="cart-total">₹{total.toFixed(0)}</span>
-                    <span className="cart-arrow">→</span>
-                </div>
-            </button>
+                <button className="cart-bar-checkout-btn">
+                    Check Out ↗
+                </button>
+            </div>
         </div>
     );
 }
