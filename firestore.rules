@@ -2,16 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Staff are authenticated with non-anonymous providers (e.g. password, google)
-    function isStaff() {
-      return isAuthenticated() && request.auth.token.firebase.sign_in_provider != 'anonymous';
-    }
-
     match /users/{userId} {
       allow read, write: if true;
     }
@@ -21,16 +11,12 @@ service cloud.firestore {
     }
 
     match /restaurants/{restaurantId} {
-      // Restaurant info is public (name, logo, etc.)
-      allow read: if true;
-      // Only staff can update restaurant details
-      allow write: if isStaff();
+      // Restaurant info and settings readable and writable
+      allow read, write: if true;
 
       match /menuItems/{itemId} {
-        // Menu is publicly readable (customers browse it)
-        allow read: if true;
-        // Only staff can add/edit/delete menu items
-        allow write: if isStaff();
+        // Menu items readable and writable
+        allow read, write: if true;
       }
       
       match /sessions/{sessionId} {
