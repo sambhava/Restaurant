@@ -49,20 +49,13 @@ const useAuthStore = create((set, get) => ({
                     
                     // Listen to profile changes in real-time
                     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-                        let restId = defaultRestId;
-                        let restName = defaultRestName;
+                        let restId = 'rest-2';
+                        let restName = 'Pinch Of Salt';
                         let profile = { email: user.email, restaurantId: restId, restaurantName: restName, role: 'owner' };
 
                         if (docSnap.exists()) {
-                            profile = docSnap.data();
-                            if (profile.restaurantId) restId = profile.restaurantId;
-                            if (profile.restaurantName) restName = profile.restaurantName;
-                        }
-
-                        // Override for known main restaurant if rest_test123
-                        if (restId === 'rest_test123' || !restId) {
-                            restId = 'rest-2';
-                            restName = 'Pinch Of Salt';
+                            const data = docSnap.data();
+                            if (data.restaurantName) restName = data.restaurantName;
                         }
 
                         const userObj = { uid: user.uid, email: user.email };
@@ -70,14 +63,14 @@ const useAuthStore = create((set, get) => ({
                         set({
                             user: userObj,
                             userProfile: profile,
-                            restaurantId: restId,
+                            restaurantId: 'rest-2',
                             restaurantName: restName,
                             loading: false,
                             error: null,
                         });
 
                         localStorage.setItem('authUser', JSON.stringify(userObj));
-                        localStorage.setItem('restaurantId', restId);
+                        localStorage.setItem('restaurantId', 'rest-2');
                         localStorage.setItem('restaurantName', restName);
                     }, (err) => {
                         console.error("Profile snapshot listener error:", err);
@@ -93,12 +86,11 @@ const useAuthStore = create((set, get) => ({
                 // If user logged in via custom website auth (stored in localStorage), preserve session across refresh
                 const stored = getStoredUser();
                 if (stored) {
-                    const rId = localStorage.getItem('restaurantId') || 'rest-2';
                     const rName = localStorage.getItem('restaurantName') || 'Pinch Of Salt';
                     set({
                         user: stored,
-                        userProfile: { email: stored.email, restaurantId: rId, restaurantName: rName, role: 'owner' },
-                        restaurantId: rId,
+                        userProfile: { email: stored.email, restaurantId: 'rest-2', restaurantName: rName, role: 'owner' },
+                        restaurantId: 'rest-2',
                         restaurantName: rName,
                         loading: false,
                         error: null,
@@ -166,44 +158,38 @@ const useAuthStore = create((set, get) => ({
             }
 
             const uid = userCredential?.user?.uid || `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-            let restaurantId = 'rest-2';
+            const restaurantId = 'rest-2';
             let rName = 'Pinch Of Salt';
 
             const existingProfile = await getDoc(doc(db, 'users', uid)).catch(() => null);
-            if (existingProfile && existingProfile.exists() && existingProfile.data().restaurantId) {
-                restaurantId = existingProfile.data().restaurantId;
-                rName = existingProfile.data().restaurantName || rName;
-            }
-
-            if (restaurantId === 'rest_test123' || !restaurantId) {
-                restaurantId = 'rest-2';
-                rName = 'Pinch Of Salt';
+            if (existingProfile && existingProfile.exists() && existingProfile.data().restaurantName) {
+                rName = existingProfile.data().restaurantName;
             }
 
             const userObj = { uid, email: cleanEmail };
 
             set({
                 user: userObj,
-                userProfile: existingProfile && existingProfile.exists() ? existingProfile.data() : { email: cleanEmail, restaurantName: rName, restaurantId, role: 'owner' },
-                restaurantId,
+                userProfile: { email: cleanEmail, restaurantName: rName, restaurantId: 'rest-2', role: 'owner' },
+                restaurantId: 'rest-2',
                 restaurantName: rName,
                 loading: false,
                 error: null,
             });
 
             localStorage.setItem('authUser', JSON.stringify(userObj));
-            localStorage.setItem('restaurantId', restaurantId);
+            localStorage.setItem('restaurantId', 'rest-2');
             localStorage.setItem('restaurantName', rName);
 
             Promise.all([
                 setDoc(doc(db, 'users', uid), {
                     email: cleanEmail,
                     restaurantName: rName,
-                    restaurantId,
+                    restaurantId: 'rest-2',
                     role: 'owner',
                     lastLogin: new Date(),
                 }, { merge: true }),
-                setDoc(doc(db, 'restaurants', restaurantId), {
+                setDoc(doc(db, 'restaurants', 'rest-2'), {
                     name: rName,
                     ownerId: uid,
                 }, { merge: true }),
@@ -223,7 +209,7 @@ const useAuthStore = create((set, get) => ({
             await signOut(auth).catch(() => {});
             localStorage.removeItem('authUser');
             localStorage.removeItem('restaurantName');
-            localStorage.removeItem('restaurantId');
+            localStorage.setItem('restaurantId', 'rest-2');
             set({ user: null, userProfile: null, restaurantId: 'rest-2', restaurantName: 'Pinch Of Salt', unsubscribeProfile: null, loading: false });
         } catch (err) {
             console.error('Logout error:', err);
@@ -266,22 +252,22 @@ const useAuthStore = create((set, get) => ({
                 sendPasswordResetEmail(auth, cleanEmail).catch(() => {});
             }
 
-            const restId = (cleanEmail === 'sambhavajain512@gmail.com') ? 'rest-2' : (localStorage.getItem('restaurantId') || 'rest-2');
-            const restName = (cleanEmail === 'sambhavajain512@gmail.com') ? 'Pinch Of Salt' : (localStorage.getItem('restaurantName') || 'Pinch Of Salt');
+            const restaurantId = 'rest-2';
+            const restName = 'Pinch Of Salt';
             const fallbackUid = userObj ? userObj.uid : `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
             const activeUser = userObj ? { uid: userObj.uid, email: userObj.email } : { uid: fallbackUid, email: cleanEmail };
 
             set({
                 user: activeUser,
-                userProfile: { email: cleanEmail, restaurantId: restId, restaurantName: restName, role: 'owner' },
-                restaurantId: restId,
+                userProfile: { email: cleanEmail, restaurantId: 'rest-2', restaurantName: restName, role: 'owner' },
+                restaurantId: 'rest-2',
                 restaurantName: restName,
                 loading: false,
                 error: null,
             });
 
             localStorage.setItem('authUser', JSON.stringify(activeUser));
-            localStorage.setItem('restaurantId', restId);
+            localStorage.setItem('restaurantId', 'rest-2');
             localStorage.setItem('restaurantName', restName);
 
         } catch (err) {
