@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
@@ -38,6 +38,10 @@ const useAuthStore = create((set, get) => ({
 
     // Initialize listener for auth state changes
     initAuth: () => {
+        setPersistence(auth, browserLocalPersistence).catch((err) => {
+            console.warn('Could not set auth persistence:', err);
+        });
+
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 try {

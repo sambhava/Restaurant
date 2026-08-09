@@ -19,9 +19,16 @@ export default function LoginPage() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const { login, updateForgotPasswordInDb, loading, error, clearError } = useAuthStore();
+    const { user, login, updateForgotPasswordInDb, loading, error, clearError } = useAuthStore();
     const navigate = useNavigate();
     const otpRefs = useRef([]);
+
+    // Auto redirect if user is already logged in
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard/orders', { replace: true });
+        }
+    }, [user, navigate]);
 
     // Countdown timer for OTP resend
     useEffect(() => {

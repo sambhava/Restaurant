@@ -27,6 +27,7 @@ function OrderRedirect() {
 
 function App() {
   const initAuth = useAuthStore((s) => s.initAuth);
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     initAuth();
@@ -36,6 +37,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<Navigate to={user ? "/dashboard/orders" : "/login"} replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/order" element={<OrderRedirect />} />
           <Route
@@ -52,7 +54,7 @@ function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route index element={<Navigate to="orders" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to={user ? "/dashboard/orders" : "/login"} replace />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
