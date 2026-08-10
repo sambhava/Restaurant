@@ -263,7 +263,7 @@ export default function MenuPage() {
                             />
                         )}
                         <h1 className="splash-title">Welcome to</h1>
-                        <h2 className="splash-restaurant">{restaurantInfo?.name || 'Pinch Of Salt'}</h2>
+                        <h2 className="splash-restaurant">{restaurantInfo?.name || 'Our Menu'}</h2>
                         <p className="splash-subtitle">Happy Dining!</p>
                         <div className="splash-sparkles">✨✨✨</div>
                     </div>
@@ -281,7 +281,7 @@ export default function MenuPage() {
                     />
                     <div>
                         <h1 className="restaurant-name">
-                            {restaurantInfo?.name || 'Pinch Of Salt'}
+                            {restaurantInfo?.name || 'Menu'}
                         </h1>
                         <p className="table-info">Table {tableNumber}</p>
                     </div>

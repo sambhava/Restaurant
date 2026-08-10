@@ -20,8 +20,15 @@ export function getOrderParams() {
     }
 
     // Legacy URL format: /order?r={restaurant_id}&t={table_number}
-    const restaurantId = params.get('r') || 'rest-2';
-    const tableNumber = parseInt(params.get('t'), 10) || 1;
+    // Both params are required — there is no default restaurant. Without them we
+    // cannot know which restaurant the diner is sitting in, and guessing would
+    // show them somebody else's menu.
+    const restaurantId = params.get('r');
+    const tableNumber = parseInt(params.get('t'), 10);
+
+    if (!restaurantId || !Number.isFinite(tableNumber) || tableNumber < 1) {
+        return { restaurantId: '', tableNumber: 0, valid: false, tokenUsed: false };
+    }
 
     return {
         restaurantId,

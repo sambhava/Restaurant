@@ -1,0 +1,416 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sit-N-Order — design tokens
+
+   Carried from the product itself (restaurant-dashboard/src/index.css) so the
+   marketing site and the app a customer logs into read as one brand.
+
+   Amber is a STROKE and FILL colour. At 2.1:1 on white it must never carry
+   body text — use --color-amber-deep (5.3:1, passes AA) when amber must be
+   read rather than seen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  --color-ink: #0f172a;
+  --color-ink-soft: #475569;
+  --color-ink-dim: #64748b;
+  --color-amber: #f59e0b;
+  --color-amber-deep: #b45309;
+  --color-amber-wash: #fffbeb;
+  --color-paper: #ffffff;
+  --color-paper-2: #f8fafc;
+  --color-rule: #e2e8f0;
+  --color-veg: #10b981;
+  --color-nonveg: #ef4444;
+
+  --font-display: var(--font-poppins), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-card: 16px;
+  --ease-brand: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  text-wrap: balance;
+  margin: 0;
+}
+
+p {
+  text-wrap: pretty;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-amber-deep);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Respect the OS setting — every animation below is opt-in, never required
+   to understand the page. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .stroke-draw {
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.shell {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.shell-narrow {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+/* ── Type scale ──────────────────────────────────────────────────────────── */
+
+.t-hero {
+  font-size: clamp(2.75rem, 7.5vw, 5.25rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.t-section {
+  font-size: clamp(2rem, 4.2vw, 3rem);
+  font-weight: 700;
+}
+
+.t-card {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.t-lede {
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  color: var(--color-ink-soft);
+  line-height: 1.65;
+}
+
+/* The eyebrow doubles as the veg-badge mark: a square outline with a dot,
+   the FSSAI indicator every Indian menu is legally required to print. It is
+   the site's structural bullet — borrowed from the product, not invented. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-amber-deep);
+}
+
+.eyebrow::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at center, currentColor 0 2.6px, transparent 2.7px);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-brand);
+}
+
+.btn-primary {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.btn-primary:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-rule);
+  color: var(--color-ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-ink);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Monoline stroke animation ───────────────────────────────────────────── */
+/* Every illustration is one continuous line. `.stroke-draw` holds it retracted
+   until `[data-drawn]` is set by the IntersectionObserver in <DrawOnScroll>. */
+
+.stroke-draw {
+  stroke-dasharray: var(--len, 1200);
+  stroke-dashoffset: var(--len, 1200);
+  transition: stroke-dashoffset 1.4s var(--ease-brand);
+}
+
+[data-drawn="true"] .stroke-draw {
+  stroke-dashoffset: 0;
+}
+
+.fade-up {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.7s var(--ease-brand),
+    transform 0.7s var(--ease-brand);
+}
+
+[data-drawn="true"] .fade-up {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── Receipt ─────────────────────────────────────────────────────────────── */
+/* The pricing page is set as the artifact the product prints. Owners read
+   dozens of these a day; it reframes "price" as "bill". */
+
+.receipt {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule);
+  border-radius: 4px;
+  padding: 34px 30px;
+  max-width: 420px;
+  margin-inline: auto;
+  box-shadow: 0 12px 40px rgb(15 23 42 / 0.07);
+  line-height: 1.85;
+}
+
+.receipt-rule {
+  border: none;
+  border-top: 1px dashed #cbd5e1;
+  margin: 14px 0;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.receipt-total {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  border-top: 2px solid var(--color-ink);
+  padding-top: 10px;
+  margin-top: 8px;
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+.field {
+  display: block;
+  margin-bottom: 18px;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: 6px;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--color-ink-dim);
+  font-weight: 400;
+}
+
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--color-rule);
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  transition: border-color 0.2s var(--ease-brand);
+}
+
+.input:focus {
+  border-color: var(--color-amber);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(245 158 11 / 0.13);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-nonveg);
+}
+
+.field-error {
+  font-size: 0.8125rem;
+  color: #b91c1c;
+  margin-top: 5px;
+}
+
+/* Consent rows are deliberately generous: each is an independent decision and
+   must not read as one block to be ticked through. */
+.consent {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border: 1.5px solid var(--color-rule);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease-brand);
+}
+
+.consent:hover {
+  border-color: #cbd5e1;
+}
+
+.consent input {
+  width: 19px;
+  height: 19px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-amber-deep);
+  cursor: pointer;
+}
+
+.consent-text {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-ink-soft);
+}
+
+.consent-text strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* ── Prose, for the legal documents ──────────────────────────────────────── */
+
+.prose h2 {
+  font-size: 1.375rem;
+  margin: 40px 0 12px;
+}
+
+.prose h3 {
+  font-size: 1.0625rem;
+  margin: 26px 0 8px;
+}
+
+.prose p,
+.prose li {
+  color: var(--color-ink-soft);
+  font-size: 0.9375rem;
+  margin-bottom: 12px;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 22px;
+  margin-bottom: 12px;
+}
+
+.prose a {
+  color: var(--color-amber-deep);
+  text-underline-offset: 3px;
+}
+
+/* Placeholders the owner must replace before launch — deliberately loud so
+   they cannot ship unnoticed. */
+.prose mark,
+mark.todo {
+  background: var(--color-amber-wash);
+  border-bottom: 1.5px solid var(--color-amber);
+  color: var(--color-amber-deep);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.summary-box {
+  background: var(--color-paper-2);
+  border-left: 3px solid var(--color-amber);
+  border-radius: 0 10px 10px 0;
+  padding: 18px 22px;
+  margin: 24px 0 32px;
+}
+
+.summary-box p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-ink-soft);
+}

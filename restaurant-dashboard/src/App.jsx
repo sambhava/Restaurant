@@ -27,7 +27,12 @@ function OrderRedirect() {
 
 function App() {
   const initAuth = useAuthStore((s) => s.initAuth);
-  const user = useAuthStore((s) => s.user);
+  const restaurantId = useAuthStore((s) => s.restaurantId);
+  const accountStatus = useAuthStore((s) => s.accountStatus);
+
+  // Only a provisioned, active account belongs on the dashboard; everyone else
+  // starts at /login, which handles both signed-out and awaiting-activation.
+  const hasAccess = !!restaurantId && accountStatus === 'active';
 
   useEffect(() => {
     initAuth();
@@ -37,7 +42,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to={user ? "/dashboard/orders" : "/login"} replace />} />
+          <Route path="/" element={<Navigate to={hasAccess ? "/dashboard/orders" : "/login"} replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/order" element={<OrderRedirect />} />
           <Route
@@ -54,7 +59,7 @@ function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route index element={<Navigate to="orders" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to={user ? "/dashboard/orders" : "/login"} replace />} />
+          <Route path="*" element={<Navigate to={hasAccess ? "/dashboard/orders" : "/login"} replace />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

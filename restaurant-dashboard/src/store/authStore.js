@@ -1,268 +1,130 @@
 import { create } from 'zustand';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import {
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    setPersistence,
+    browserLocalPersistence,
+} from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
-const getStoredUser = () => {
-    try {
-        const item = localStorage.getItem('authUser');
-        return item ? JSON.parse(item) : null;
-    } catch {
-        return null;
-    }
+/**
+ * Auth + tenancy store.
+ *
+ * Firebase Auth is the only session authority — there is no localStorage
+ * fallback, and no restaurantId is ever assumed. Every tenant's id comes from
+ * their own users/{uid} document, so two accounts can never share data.
+ *
+ * Accounts are created only by the website's activation flow, never here.
+ */
+
+const EMPTY_SESSION = {
+    user: null,
+    userProfile: null,
+    restaurantId: null,
+    restaurantName: null,
+    accountStatus: null,
 };
 
-const defaultRestId = localStorage.getItem('restaurantId') || 'rest-2';
-const defaultRestName = localStorage.getItem('restaurantName') || 'Pinch Of Salt';
-
 const useAuthStore = create((set, get) => ({
-    user: getStoredUser(),
-    userProfile: getStoredUser() ? { email: getStoredUser().email, restaurantId: defaultRestId, restaurantName: defaultRestName, role: 'owner' } : null,
-    restaurantId: defaultRestId,
-    restaurantName: defaultRestName,
+    ...EMPTY_SESSION,
+    // Stays true until Firebase reports the restored session, so ProtectedRoute
+    // can tell "not logged in" apart from "not known yet".
+    initialising: true,
     loading: false,
     error: null,
     unsubscribeProfile: null,
 
-    // Initialize listener for auth state changes
     initAuth: () => {
         setPersistence(auth, browserLocalPersistence).catch((err) => {
             console.warn('Could not set auth persistence:', err);
         });
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                try {
-                    if (get().unsubscribeProfile) {
-                        get().unsubscribeProfile();
+        onAuthStateChanged(auth, (firebaseUser) => {
+            const previous = get().unsubscribeProfile;
+            if (previous) previous();
+
+            if (!firebaseUser) {
+                set({ ...EMPTY_SESSION, unsubscribeProfile: null, initialising: false, loading: false });
+                return;
+            }
+
+            const userObj = { uid: firebaseUser.uid, email: firebaseUser.email };
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+
+            const unsubscribe = onSnapshot(
+                userDocRef,
+                (docSnap) => {
+                    if (!docSnap.exists()) {
+                        // Authenticated but not provisioned — activation hasn't run yet.
+                        set({
+                            ...EMPTY_SESSION,
+                            user: userObj,
+                            accountStatus: 'unprovisioned',
+                            initialising: false,
+                            loading: false,
+                        });
+                        return;
                     }
 
-                    const userDocRef = doc(db, 'users', user.uid);
-                    
-                    // Listen to profile changes in real-time
-                    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-                        let restId = localStorage.getItem('restaurantId') || 'rest-2';
-                        let restName = localStorage.getItem('restaurantName') || 'Pinch Of Salt';
-
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            if (data.restaurantName) restName = data.restaurantName;
-                            if (data.restaurantId) restId = data.restaurantId;
-                        }
-
-                        const profile = { email: user.email, restaurantId: restId, restaurantName: restName, role: 'owner' };
-                        const userObj = { uid: user.uid, email: user.email };
-
-                        set({
-                            user: userObj,
-                            userProfile: profile,
-                            restaurantId: restId,
-                            restaurantName: restName,
-                            loading: false,
-                            error: null,
-                        });
-
-                        localStorage.setItem('authUser', JSON.stringify(userObj));
-                        localStorage.setItem('restaurantId', restId);
-                        localStorage.setItem('restaurantName', restName);
-                    }, (err) => {
-                        console.error("Profile snapshot listener error:", err);
-                        set({ loading: false });
-                    });
-
-                    set({ unsubscribeProfile: unsubscribe });
-
-                } catch {
-                    set({ loading: false });
-                }
-            } else {
-                // If user logged in via custom website auth (stored in localStorage), preserve session across refresh
-                const stored = getStoredUser();
-                if (stored) {
-                    const rName = localStorage.getItem('restaurantName') || 'Pinch Of Salt';
+                    const data = docSnap.data();
                     set({
-                        user: stored,
-                        userProfile: { email: stored.email, restaurantId: 'rest-2', restaurantName: rName, role: 'owner' },
-                        restaurantId: 'rest-2',
-                        restaurantName: rName,
+                        user: userObj,
+                        userProfile: {
+                            email: firebaseUser.email,
+                            restaurantId: data.restaurantId ?? null,
+                            restaurantName: data.restaurantName ?? null,
+                            role: data.role ?? 'owner',
+                        },
+                        restaurantId: data.restaurantId ?? null,
+                        restaurantName: data.restaurantName ?? null,
+                        accountStatus: data.status ?? 'active',
+                        initialising: false,
                         loading: false,
                         error: null,
                     });
-                } else {
-                    if (get().unsubscribeProfile) {
-                        get().unsubscribeProfile();
-                    }
-                    set({ user: null, userProfile: null, restaurantId: 'rest-2', restaurantName: 'Pinch Of Salt', unsubscribeProfile: null, loading: false });
+                },
+                (err) => {
+                    console.error('Profile snapshot listener error:', err);
+                    set({ initialising: false, loading: false, error: 'Could not load your account.' });
                 }
-            }
+            );
+
+            set({ unsubscribeProfile: unsubscribe });
         });
     },
 
     login: async (email, password) => {
+        set({ loading: true, error: null });
         try {
-            set({ loading: true, error: null });
-            const cleanEmail = email.trim().toLowerCase();
-            let userCredential = null;
-            let authenticatedWithFirebase = false;
-
-            // 1. Try signing in via Firebase Auth first
-            try {
-                userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-                authenticatedWithFirebase = true;
-            } catch (authErr) {
-                if (authErr.code === 'auth/user-not-found') {
-                    try {
-                        userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-                        authenticatedWithFirebase = true;
-                    } catch {
-                        // Email exists or invalid
-                    }
-                }
-            }
-
-            // 2. Fetch stored user_auth credential document from Firestore
-            const userAuthRef = doc(db, 'users_auth', cleanEmail);
-            let userAuthSnap = null;
-            try {
-                userAuthSnap = await getDoc(userAuthRef);
-            } catch (err) {
-                console.warn('Could not fetch user_auth doc:', err);
-            }
-
-            if (userAuthSnap && userAuthSnap.exists()) {
-                const storedPassword = userAuthSnap.data().password;
-                if (storedPassword && storedPassword !== password) {
-                    // Password mismatch -> REJECT old/wrong password
-                    throw new Error('Incorrect password. If you recently reset your password, please enter your new password.');
-                }
-            } else if (!authenticatedWithFirebase && !userCredential) {
-                throw new Error('Invalid email or password. Please check your credentials or reset your password.');
-            }
-
-            // Save/sync current active password to users_auth
-            try {
-                await setDoc(userAuthRef, {
-                    email: cleanEmail,
-                    password: password,
-                    updatedAt: new Date(),
-                }, { merge: true });
-            } catch (err) {
-                console.warn('Could not save user_auth doc:', err);
-            }
-
-            const uid = userCredential?.user?.uid || `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-            let rName = 'Pinch Of Salt';
-
-            const existingProfile = await getDoc(doc(db, 'users', uid)).catch(() => null);
-            if (existingProfile && existingProfile.exists() && existingProfile.data().restaurantName) {
-                rName = existingProfile.data().restaurantName;
-            }
-
-            const userObj = { uid, email: cleanEmail };
-
-            set({
-                user: userObj,
-                userProfile: { email: cleanEmail, restaurantName: rName, restaurantId: 'rest-2', role: 'owner' },
-                restaurantId: 'rest-2',
-                restaurantName: rName,
-                loading: false,
-                error: null,
-            });
-
-            localStorage.setItem('authUser', JSON.stringify(userObj));
-            localStorage.setItem('restaurantId', 'rest-2');
-            localStorage.setItem('restaurantName', rName);
-
-            Promise.all([
-                setDoc(doc(db, 'users', uid), {
-                    email: cleanEmail,
-                    restaurantName: rName,
-                    restaurantId: 'rest-2',
-                    role: 'owner',
-                    lastLogin: new Date(),
-                }, { merge: true }),
-                setDoc(doc(db, 'restaurants', 'rest-2'), {
-                    name: rName,
-                    ownerId: uid,
-                }, { merge: true }),
-            ]).catch(console.error);
-
+            await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+            // onAuthStateChanged populates the session and clears `loading`.
         } catch (err) {
-            set({ error: err.message, loading: false });
+            set({ error: err.code || err.message, loading: false });
             throw err;
         }
     },
 
     logout: async () => {
+        const unsubscribe = get().unsubscribeProfile;
+        if (unsubscribe) unsubscribe();
         try {
-            if (get().unsubscribeProfile) {
-                get().unsubscribeProfile();
-            }
-            await signOut(auth).catch(() => {});
-            localStorage.removeItem('authUser');
-            localStorage.removeItem('restaurantName');
-            localStorage.setItem('restaurantId', 'rest-2');
-            set({ user: null, userProfile: null, restaurantId: 'rest-2', restaurantName: 'Pinch Of Salt', unsubscribeProfile: null, loading: false });
+            await signOut(auth);
         } catch (err) {
             console.error('Logout error:', err);
         }
+        set({ ...EMPTY_SESSION, unsubscribeProfile: null, loading: false });
     },
 
     resetPassword: async (email) => {
+        set({ loading: true, error: null });
         try {
-            set({ loading: true, error: null });
             await sendPasswordResetEmail(auth, email.trim().toLowerCase());
             set({ loading: false });
         } catch (err) {
-            set({ error: err.message, loading: false });
-            throw err;
-        }
-    },
-
-    updateForgotPasswordInDb: async (email, newPassword) => {
-        try {
-            set({ loading: true, error: null });
-            const cleanEmail = email.trim().toLowerCase();
-
-            // 1. Update the master active password in Firestore users_auth collection safely
-            try {
-                const userAuthRef = doc(db, 'users_auth', cleanEmail);
-                await setDoc(userAuthRef, {
-                    email: cleanEmail,
-                    password: newPassword,
-                    updatedAt: new Date(),
-                }, { merge: true });
-            } catch (err) {
-                console.warn('Could not save user_auth doc on password reset:', err);
-            }
-
-            // 2. Try updating in Firebase Auth if current user is logged in
-            let userObj = auth.currentUser;
-            if (userObj) {
-                await updatePassword(userObj, newPassword).catch(() => {});
-            } else {
-                sendPasswordResetEmail(auth, cleanEmail).catch(() => {});
-            }
-
-            const restName = 'Pinch Of Salt';
-            const fallbackUid = userObj ? userObj.uid : `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-            const activeUser = userObj ? { uid: userObj.uid, email: userObj.email } : { uid: fallbackUid, email: cleanEmail };
-
-            set({
-                user: activeUser,
-                userProfile: { email: cleanEmail, restaurantId: 'rest-2', restaurantName: restName, role: 'owner' },
-                restaurantId: 'rest-2',
-                restaurantName: restName,
-                loading: false,
-                error: null,
-            });
-
-            localStorage.setItem('authUser', JSON.stringify(activeUser));
-            localStorage.setItem('restaurantId', 'rest-2');
-            localStorage.setItem('restaurantName', restName);
-
-        } catch (err) {
-            set({ error: err.message, loading: false });
+            set({ error: err.code || err.message, loading: false });
             throw err;
         }
     },
@@ -270,6 +132,11 @@ const useAuthStore = create((set, get) => ({
     setError: (error) => set({ error }),
     clearError: () => set({ error: null }),
     isAuthenticated: () => !!get().user,
+    /** True only when the account is provisioned and allowed into the dashboard. */
+    hasDashboardAccess: () => {
+        const { restaurantId, accountStatus } = get();
+        return !!restaurantId && accountStatus === 'active';
+    },
 }));
 
 export default useAuthStore;

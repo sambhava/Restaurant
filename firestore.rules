@@ -1,34 +1,152 @@
 rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sit-N-Order — Firestore security rules
+//
+// The threat model these rules exist to stop:
+//   1. Restaurant A reading or writing Restaurant B's menu, orders or revenue.
+//   2. A diner (anonymous auth) reaching anything beyond their own table's order.
+//   3. Anyone reading the signups collection, which holds contact details,
+//      FSSAI numbers and GSTINs.
+//   4. A staff account escalating itself to another tenant by editing its own
+//      users/{uid} document.
+//
+// Client code must never be the only thing enforcing tenancy — these rules are
+// the actual boundary. Deploy with:  firebase deploy --only firestore:rules
+// ─────────────────────────────────────────────────────────────────────────────
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /users/{userId} {
-      allow read, write: if true;
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /users_auth/{emailDoc} {
-      allow read, write: if true;
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    match /restaurants/{restaurantId} {
-      // Restaurant info and settings readable and writable
-      allow read, write: if true;
+    function isProvisioned() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().status == 'active';
+    }
 
+    // The single tenancy test. Everything under restaurants/{rid} goes through it.
+    function ownsRestaurant(rid) {
+      return isProvisioned() && userDoc().restaurantId == rid;
+    }
+
+    // Platform owner — set with the Admin SDK:
+    //   admin.auth().setCustomUserClaims(uid, { admin: true })
+    // Deliberately a custom claim, not a Firestore flag, so it cannot be
+    // granted by anything the client is able to write.
+    function isPlatformAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function changesOnly(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(allowedFields);
+    }
+
+    // ── users ───────────────────────────────────────────────────────────────
+    // A user reads only their own profile. They may never write it: restaurantId,
+    // role and status are provisioning decisions, and letting a client edit
+    // restaurantId would hand it any tenant it liked. Writes are Admin SDK only.
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isPlatformAdmin();
+    }
+
+    // ── signups ─────────────────────────────────────────────────────────────
+    // Written by the public signup form, read only by the platform admin.
+    // Create-only for the public: no reading others' submissions, and no
+    // editing your own status to 'activated'.
+
+    match /signups/{signupId} {
+      allow create: if request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasAll(['businessName', 'email', 'consents', 'status'])
+                    && request.resource.data.email is string
+                    && request.resource.data.businessName is string
+                    && request.resource.data.businessName.size() > 0
+                    && request.resource.data.businessName.size() <= 200;
+      allow read, update, delete: if isPlatformAdmin();
+    }
+
+    // ── restaurants/{rid} ───────────────────────────────────────────────────
+
+    match /restaurants/{rid} {
+
+      // The restaurant profile (name, logo, isOpen, tableCount) is public-read:
+      // the customer app shows it to diners who are not signed in beyond
+      // anonymous auth. It holds no sensitive data. Writes are owner-only.
+      allow read: if true;
+      allow write: if ownsRestaurant(rid);
+
+      // ── menuItems ──
+      // Publicly readable — a diner scanning a QR must load the menu. Only the
+      // owning restaurant can add, edit or remove items.
       match /menuItems/{itemId} {
-        // Menu items readable and writable
-        allow read, write: if true;
-      }
-      
-      match /sessions/{sessionId} {
-        // Sessions readable and writable by dashboard staff and customer QR apps
-        allow read, create, update: if true;
-        allow delete: if true;
+        allow read: if true;
+        allow write: if ownsRestaurant(rid);
       }
 
-      match /orders/{orderId} {
-        // Orders readable and writable by dashboard staff and customer QR apps
-        allow read, create, update, delete: if true;
+      // ── sessions ──
+      // A table session is created by whoever scans the table's QR, then read
+      // and updated as items are added. Anonymous diners may create and append;
+      // only staff may close a session or alter it beyond the running total.
+      match /sessions/{sessionId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+                      && request.resource.data.status == 'active'
+                      && request.resource.data.tableNumber is number;
+
+        // Diners may only extend the session (add orders, adjust running totals).
+        // Closing it — and therefore settling the bill — is staff-only.
+        allow update: if ownsRestaurant(rid)
+                      || (isSignedIn()
+                          && resource.data.status == 'active'
+                          && request.resource.data.status == 'active'
+                          && changesOnly(['orderIds', 'subtotal', 'tax', 'total', 'updatedAt']));
+
+        allow delete: if ownsRestaurant(rid);
       }
+
+      // ── orders ──
+      // Diners place orders and watch their status. They may not edit an order
+      // once placed — repricing or re-statusing is staff-only. This is what
+      // stops a diner setting their own total to zero.
+      match /orders/{orderId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+                      && request.resource.data.status in ['pending', 'accepted']
+                      && request.resource.data.tableNumber is number
+                      && request.resource.data.items is list
+                      && request.resource.data.total is number
+                      && request.resource.data.total >= 0;
+
+        allow update, delete: if ownsRestaurant(rid);
+      }
+
+      // Any subcollection not named above is owner-only by default, so adding
+      // one later fails closed rather than silently going public.
+      match /{document=**} {
+        allow read, write: if ownsRestaurant(rid);
+      }
+    }
+
+    // ── Default deny ────────────────────────────────────────────────────────
+    // Anything not matched above — including the retired users_auth collection —
+    // is unreachable from any client.
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

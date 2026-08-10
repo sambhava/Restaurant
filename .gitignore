@@ -2,3 +2,14 @@
 .env
 .env.local
 .env.*.local
+
+# Local backup of the retired users_auth collection. Names real accounts.
+users_auth.backup.json
+
+# Logs and runtime errors
+*.log
+*.err
+
+# Firebase service-account keys. These bypass every security rule.
+*serviceAccount*.json
+*-firebase-adminsdk-*.json

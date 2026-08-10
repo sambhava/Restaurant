@@ -78,7 +78,7 @@ export default function DashboardLayout() {
                             if (e.target.src !== '/logo.jpg') e.target.src = '/logo.jpg';
                         }}
                     />
-                    <span className="brand-text">{restaurantName || 'Pinch Of Salt'}</span>
+                    <span className="brand-text">{restaurantName || 'My Restaurant'}</span>
                 </div>
 
                 {/* Open / Closed Toggle Switch Card */}
