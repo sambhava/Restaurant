@@ -30,7 +30,7 @@ function formatDate(d) {
 }
 
 // ─── SVG Bezier Curve Line Chart ──────────────────────────
-function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
+function SmoothLineChart({ data, color = '#34D399', height = 200 }) {
     if (!data || data.length === 0) {
         return (
             <div className="chart-empty" style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
@@ -40,9 +40,9 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
     }
 
     const maxVal = Math.max(...data.map(d => d.value), 1);
-    const paddingX = 35;
-    const paddingTop = 25;
-    const paddingBottom = 35;
+    const paddingX = 24;
+    const paddingTop = 20;
+    const paddingBottom = 32;
     const chartW = 600;
     const chartH = height - paddingBottom;
     const drawableH = chartH - paddingTop;
@@ -59,7 +59,7 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
         if (points.length === 2) {
             pathD += ` L ${points[1].x.toFixed(1)} ${points[1].y.toFixed(1)}`;
         } else if (points.length > 2) {
-            const tension = 0.22;
+            const tension = 0.2;
             for (let i = 0; i < points.length - 1; i++) {
                 const p0 = i === 0 ? points[0] : points[i - 1];
                 const p1 = points[i];
@@ -78,10 +78,9 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
 
     const areaD = pathD ? `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${chartH} L ${points[0].x.toFixed(1)} ${chartH} Z` : '';
 
-    // Interactive pointer state (default to last point)
+    // Interactive pointer state
     const [activeIndex, setActiveIndex] = useState(points.length - 1);
 
-    // Keep activeIndex within range
     const activeIdxClamped = Math.min(Math.max(0, activeIndex), points.length - 1);
     const activePoint = points[activeIdxClamped] || { x: 0, y: 0 };
     const activeData = data[activeIdxClamped] || { label: '', value: 0 };
@@ -116,10 +115,10 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
         }
     };
 
-    const tooltipWidth = 120;
+    const tooltipWidth = 110;
     const tooltipX = Math.max(10, Math.min(chartW - tooltipWidth - 10, activePoint.x - tooltipWidth / 2));
-    const isNearTop = activePoint.y < 65;
-    const tooltipY = isNearTop ? activePoint.y + 16 : activePoint.y - 48;
+    const isNearTop = activePoint.y < 60;
+    const tooltipY = isNearTop ? activePoint.y + 14 : activePoint.y - 44;
 
     // Filter label steps to render ~3-5 clean X-axis labels (like 8:00 AM, 4:00 PM, 12:00 PM)
     const totalPoints = points.length;
@@ -146,18 +145,14 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
                 style={{ cursor: 'crosshair', overflow: 'visible', width: '100%', height: 'auto' }}
             >
                 <defs>
-                    <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity="0.22" />
-                        <stop offset="60%" stopColor={color} stopOpacity="0.08" />
+                    <linearGradient id="minimalistGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity="0.14" />
+                        <stop offset="70%" stopColor={color} stopOpacity="0.03" />
                         <stop offset="100%" stopColor={color} stopOpacity="0.0" />
                     </linearGradient>
-                    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="2" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
                 </defs>
 
-                {/* Subgrid horizontal lines */}
+                {/* Subtle horizontal grid lines */}
                 {[0, 0.5, 1].map((frac, i) => {
                     const y = paddingTop + frac * drawableH;
                     return (
@@ -167,31 +162,30 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
                             y1={y} 
                             x2={chartW - paddingX} 
                             y2={y} 
-                            stroke="var(--border)" 
-                            strokeWidth="1" 
-                            strokeDasharray="4 4" 
-                            opacity="0.6" 
+                            stroke="var(--border, #E2E8F0)" 
+                            strokeWidth="0.75" 
+                            strokeDasharray="3 4" 
+                            opacity="0.5" 
                         />
                     );
                 })}
 
-                {/* Gradient Area Fill */}
-                {areaD && <path d={areaD} fill="url(#salesGrad)" />}
+                {/* Ultra-soft Gradient Area Fill */}
+                {areaD && <path d={areaD} fill="url(#minimalistGrad)" />}
 
-                {/* Smooth Curve Line */}
+                {/* Thin Crisp Minimalist Line (1.6px) */}
                 {pathD && (
                     <path 
                         d={pathD} 
                         fill="none" 
                         stroke={color} 
-                        strokeWidth="2.8" 
+                        strokeWidth="1.6" 
                         strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        filter="url(#softGlow)"
+                        strokeLinejoin="round"
                     />
                 )}
 
-                {/* Vertical Indicator Guide Line */}
+                {/* Delicate Hairline Guide */}
                 {points.length > 0 && (
                     <line 
                         x1={activePoint.x} 
@@ -199,34 +193,30 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
                         x2={activePoint.x} 
                         y2={chartH} 
                         stroke={color} 
-                        strokeWidth="1.2" 
-                        strokeDasharray="3 3" 
-                        opacity="0.4" 
+                        strokeWidth="1" 
+                        strokeDasharray="2 3" 
+                        opacity="0.35" 
                     />
                 )}
 
-                {/* Active Tooltip & Intersection Point */}
+                {/* Subtle Active Hover Dot */}
                 {points.length > 0 && (
                     <g style={{ transition: 'transform 0.08s ease-out' }}>
-                        {/* Outer pulse aura */}
-                        <circle cx={activePoint.x} cy={activePoint.y} r="8" fill={color} opacity="0.25" />
-                        {/* Core Dot */}
-                        <circle cx={activePoint.x} cy={activePoint.y} r="5" fill="#FFFFFF" stroke={color} strokeWidth="2.5" />
+                        <circle cx={activePoint.x} cy={activePoint.y} r="3.5" fill="#FFFFFF" stroke={color} strokeWidth="2" />
                         
-                        {/* Floating Tooltip */}
+                        {/* Minimal Tooltip */}
                         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
                             <rect 
                                 width={tooltipWidth} 
-                                height="38" 
-                                rx="8" 
+                                height="34" 
+                                rx="6" 
                                 fill="#0F172A" 
-                                opacity="0.94"
-                                style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}
+                                opacity="0.9"
                             />
-                            <text x={tooltipWidth / 2} y="15" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="500">
+                            <text x={tooltipWidth / 2} y="13" textAnchor="middle" fill="#94A3B8" fontSize="9" fontWeight="400">
                                 {activeData.date || activeData.label || 'Revenue'}
                             </text>
-                            <text x={tooltipWidth / 2} y="30" textAnchor="middle" fill="#FFFFFF" fontSize="12" fontWeight="700">
+                            <text x={tooltipWidth / 2} y="26" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="600">
                                 ₹{Math.round(activeData.value).toLocaleString('en-IN')}
                             </text>
                         </g>
@@ -242,11 +232,11 @@ function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
                         <text 
                             key={idx} 
                             x={p.x} 
-                            y={chartH + 22} 
+                            y={chartH + 20} 
                             textAnchor="middle" 
-                            fill="var(--text-dim)" 
-                            fontSize="11" 
-                            fontWeight="500"
+                            fill="var(--text-dim, #9CA3AF)" 
+                            fontSize="10" 
+                            fontWeight="400"
                         >
                             {label}
                         </text>
@@ -836,7 +826,7 @@ export default function AnalyticsPage() {
                         </div>
 
                         <div className="bezier-chart-container">
-                            <SmoothLineChart data={stats.revenueTrend} color="#10B981" height={210} />
+                            <SmoothLineChart data={stats.revenueTrend} color="#34D399" height={200} />
                         </div>
 
                         {/* Subtle Metrics Footer */}
