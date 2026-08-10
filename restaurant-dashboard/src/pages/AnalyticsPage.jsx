@@ -939,39 +939,29 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
 
-                {/* Right Column (Table Activity Card Full Height) */}
+                {/* Right Column (Leaderboard only) */}
                 <div className="dashboard-right-col">
-                    <div className="table-activity-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 className="card-sec-title">Table Activity</h3>
-                            {stats.tableLeaderboard.length > 0 && (
-                                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)', padding: '4px 10px', borderRadius: '100px', border: '1px solid var(--border)' }}>
-                                    {stats.tableLeaderboard.length} Active
-                                </span>
-                            )}
-                        </div>
-                        <div className="table-activity-list">
+                    {/* Busy Tables Leaderboard with scroll bar */}
+                    <div className="team-card" style={{ minHeight: 'auto', marginBottom: '20px' }}>
+                        <h3 className="card-sec-title" style={{ marginBottom: '12px' }}>Table Activity</h3>
+                        <div className="team-list" style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
                             {stats.tableLeaderboard.length > 0 ? (
                                 stats.tableLeaderboard.map((t, idx) => (
-                                    <div key={t.table} className="table-activity-item">
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ borderRadius: '50%', background: 'rgba(52, 211, 153, 0.12)', border: '1px solid rgba(52, 211, 153, 0.25)', color: '#059669', fontWeight: 700, fontSize: '12px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                #{idx + 1}
-                                            </div>
-                                            <div className="member-info">
-                                                <span className="member-name" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', display: 'block' }}>{t.table}</span>
-                                                <span className="member-role" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.orders} {t.orders === 1 ? 'order' : 'orders'} placed</span>
-                                            </div>
+                                    <div key={t.table} className="team-member-item" style={{ paddingBottom: '10px', marginBottom: '4px' }}>
+                                        <div className="footer-metric-icon" style={{ borderRadius: '50%', background: 'var(--accent-light)', borderColor: 'var(--accent)', color: 'var(--accent)', fontWeight: 700, fontSize: '12px', width: '32px', height: '32px' }}>
+                                            #{idx + 1}
                                         </div>
-                                        <span className="trending-price" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
+                                        <div className="member-info">
+                                            <span className="member-name">{t.table}</span>
+                                            <span className="member-role">{t.orders} orders placed</span>
+                                        </div>
+                                        <span className="trending-price" style={{ fontSize: '13px' }}>
                                             ₹{t.revenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}
                                         </span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="chart-empty" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
-                                    No tables active yet
-                                </div>
+                                <div className="chart-empty">No tables active yet</div>
                             )}
                         </div>
                     </div>
