@@ -2401,21 +2401,29 @@ body {
   color: var(--text);
 }
 
-/* --- Bottom Row Grid & Right Column Layout --- */
-.bottom-row-grid {
+/* --- Full Width Analytics Grid Layout --- */
+.metrics-row-4col {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
+  width: 100%;
 }
 
-.dashboard-right-col {
-  display: flex;
-  flex-direction: column;
+.analytics-bottom-4grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
+  width: 100%;
 }
 
-@media (max-width: 900px) {
-  .bottom-row-grid {
+@media (max-width: 1200px) {
+  .metrics-row-4col, .analytics-bottom-4grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .metrics-row-4col, .analytics-bottom-4grid {
     grid-template-columns: 1fr;
   }
 }
