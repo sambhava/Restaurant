@@ -10,7 +10,6 @@ import OrderConfirmation from './pages/OrderConfirmation';
 
 function App() {
   const [init, setInit] = useState(false);
-  const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
     // Ensure anonymous auth
@@ -22,7 +21,6 @@ function App() {
         signInAnonymously(auth).catch((error) => {
           console.error("Anonymous auth failed:", error.code);
           // Still allow the app to load — menu browsing works without auth
-          setAuthFailed(true);
           setInit(true);
         });
       }

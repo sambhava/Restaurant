@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { encodeOrderToken, getCustomerAppUrl } from '../utils/tokenUtils';
 import {
@@ -80,8 +80,28 @@ export default function TablesPage() {
 
     const customerAppUrl = getCustomerAppUrl();
 
-
-
+    const fetchTableOrders = useCallback(async (session) => {
+        if (!session.orderIds || session.orderIds.length === 0) {
+            setTableOrders([]);
+            return;
+        }
+        setOrdersLoading(true);
+        try {
+            const orders = [];
+            for (const orderId of session.orderIds) {
+                const orderRef = doc(db, 'restaurants', restaurantId, 'orders', orderId);
+                const orderSnap = await getDoc(orderRef);
+                if (orderSnap.exists()) {
+                    orders.push({ id: orderSnap.id, ...orderSnap.data() });
+                }
+            }
+            setTableOrders(orders);
+        } catch (err) {
+            console.error('Error fetching orders:', err);
+        } finally {
+            setOrdersLoading(false);
+        }
+    }, [restaurantId]);
 
     useEffect(() => {
         // Load saved table count from Firestore
@@ -140,32 +160,7 @@ export default function TablesPage() {
         } else {
             setTableOrders([]);
         }
-    }, [selectedTable, sessions]);
-
-
-
-    const fetchTableOrders = async (session) => {
-        if (!session.orderIds || session.orderIds.length === 0) {
-            setTableOrders([]);
-            return;
-        }
-        setOrdersLoading(true);
-        try {
-            const orders = [];
-            for (const orderId of session.orderIds) {
-                const orderRef = doc(db, 'restaurants', restaurantId, 'orders', orderId);
-                const orderSnap = await getDoc(orderRef);
-                if (orderSnap.exists()) {
-                    orders.push({ id: orderSnap.id, ...orderSnap.data() });
-                }
-            }
-            setTableOrders(orders);
-        } catch (err) {
-            console.error('Error fetching orders:', err);
-        } finally {
-            setOrdersLoading(false);
-        }
-    };
+    }, [selectedTable, sessions, fetchTableOrders]);
 
     const executeCloseSession = async (tableNum) => {
         const session = sessions[tableNum];

@@ -5,25 +5,20 @@ import {
     where,
     onSnapshot,
     doc,
-    getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { getSessionOrders } from '../services/sessionService';
 
 const SESSION_KEY = 'restaurant_session';
 
 export default function useSession(restaurantId, tableNumber) {
     const [session, setSession] = useState(null);
     const [sessionOrders, setSessionOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!!(restaurantId && tableNumber));
 
     useEffect(() => {
         if (!restaurantId || !tableNumber) {
-            setLoading(false);
             return;
         }
-
-        setLoading(true);
 
         // 1. Check local storage for session ID to subscribe to
         let unsubscribeSession = () => { };
@@ -97,7 +92,6 @@ export default function useSession(restaurantId, tableNumber) {
     // Real-time listener for orders in this session
     useEffect(() => {
         if (!restaurantId || !session?.id) {
-            setSessionOrders([]);
             return;
         }
 

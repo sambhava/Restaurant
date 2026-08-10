@@ -1,25 +1,13 @@
 import { create } from 'zustand';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-
-/**
- * Generate a unique restaurant ID for new users.
- */
-function generateRestaurantId() {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let id = 'rest_';
-    for (let i = 0; i < 12; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return id;
-}
 
 const getStoredUser = () => {
     try {
         const item = localStorage.getItem('authUser');
         return item ? JSON.parse(item) : null;
-    } catch (e) {
+    } catch {
         return null;
     }
 };
@@ -84,7 +72,7 @@ const useAuthStore = create((set, get) => ({
 
                     set({ unsubscribeProfile: unsubscribe });
 
-                } catch (err) {
+                } catch {
                     set({ loading: false });
                 }
             } else {
@@ -126,7 +114,7 @@ const useAuthStore = create((set, get) => ({
                     try {
                         userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
                         authenticatedWithFirebase = true;
-                    } catch (createErr) {
+                    } catch {
                         // Email exists or invalid
                     }
                 }
@@ -163,7 +151,6 @@ const useAuthStore = create((set, get) => ({
             }
 
             const uid = userCredential?.user?.uid || `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-            const restaurantId = 'rest-2';
             let rName = 'Pinch Of Salt';
 
             const existingProfile = await getDoc(doc(db, 'users', uid)).catch(() => null);
@@ -257,7 +244,6 @@ const useAuthStore = create((set, get) => ({
                 sendPasswordResetEmail(auth, cleanEmail).catch(() => {});
             }
 
-            const restaurantId = 'rest-2';
             const restName = 'Pinch Of Salt';
             const fallbackUid = userObj ? userObj.uid : `user_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
             const activeUser = userObj ? { uid: userObj.uid, email: userObj.email } : { uid: fallbackUid, email: cleanEmail };

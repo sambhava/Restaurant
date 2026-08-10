@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import useAuthStore from '../store/authStore';
@@ -17,13 +17,21 @@ function playKdsAlert() {
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
-    } catch (e) { }
+    } catch {
+        // Audio playback unavailable
+    }
 }
 
 export default function KitchenDisplayPage() {
     const restaurantId = useAuthStore((s) => s.restaurantId);
     const [orders, setOrders] = useState([]);
+    const [now, setNow] = useState(() => Date.now());
     const prevCountRef = useRef(null);
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -58,7 +66,7 @@ export default function KitchenDisplayPage() {
     const timeAgo = (timestamp) => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+        const diff = Math.floor((now - date.getTime()) / 60000);
         if (diff < 1) return 'Just now';
         if (diff < 60) return `${diff}m`;
         return `${Math.floor(diff / 60)}h ${diff % 60}m`;
@@ -67,7 +75,7 @@ export default function KitchenDisplayPage() {
     const getUrgencyClass = (timestamp) => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+        const diff = Math.floor((now - date.getTime()) / 60000);
         if (diff >= 15) return 'kds-urgent';
         if (diff >= 8) return 'kds-warning';
         return '';

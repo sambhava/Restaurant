@@ -1,7 +1,7 @@
 export async function onRequestPost(context) {
     const { request, env } = context;
     try {
-        const { email, newPassword } = await request.json();
+        const { email } = await request.json();
 
         if (!email) {
             return new Response(

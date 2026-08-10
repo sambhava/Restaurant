@@ -31,7 +31,7 @@ function playNotificationSound() {
 
         oscillator.start(ctx.currentTime);
         oscillator.stop(ctx.currentTime + 0.5);
-    } catch (e) {
+    } catch {
         // Audio not supported — fail silently
     }
 }

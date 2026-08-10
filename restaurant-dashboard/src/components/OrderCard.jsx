@@ -69,11 +69,8 @@ export default function OrderCard({ order, onStatusUpdate }) {
         return 'timer-normal';
     };
 
-    const timeAgo = (timestamp) => {
-        if (!timestamp) return '';
-        const date = getOrderedDate(timestamp);
-        if (!date) return '';
-        const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+    const timeAgo = () => {
+        const diff = Math.floor(elapsedSeconds / 60);
         if (diff < 1) return 'Just now';
         if (diff < 60) return `${diff}m ago`;
         return `${Math.floor(diff / 60)}h ${diff % 60}m ago`;
@@ -136,7 +133,7 @@ export default function OrderCard({ order, onStatusUpdate }) {
             <div className="order-card-footer">
                 <div className="order-meta">
                     <span className="order-total">₹{order.total?.toFixed(0)}</span>
-                    <span className="order-time">{timeAgo(order.orderedAt)}</span>
+                    <span className="order-time">{timeAgo()}</span>
                 </div>
 
                 {nextStatus && (

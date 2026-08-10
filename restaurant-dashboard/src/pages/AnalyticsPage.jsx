@@ -31,6 +31,8 @@ function formatDate(d) {
 
 // ─── SVG Bezier Curve Line Chart ──────────────────────────
 function SmoothLineChart({ data, color = '#34D399', height = 200 }) {
+    const [activeIndex, setActiveIndex] = useState(0);
+
     if (!data || data.length === 0) {
         return (
             <div className="chart-empty" style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
@@ -77,9 +79,6 @@ function SmoothLineChart({ data, color = '#34D399', height = 200 }) {
     }
 
     const areaD = pathD ? `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${chartH} L ${points[0].x.toFixed(1)} ${chartH} Z` : '';
-
-    // Interactive pointer state
-    const [activeIndex, setActiveIndex] = useState(points.length - 1);
 
     const activeIdxClamped = Math.min(Math.max(0, activeIndex), points.length - 1);
     const activePoint = points[activeIdxClamped] || { x: 0, y: 0 };
@@ -248,7 +247,7 @@ function SmoothLineChart({ data, color = '#34D399', height = 200 }) {
 }
 
 // Fallback images map if menu items don't have images uploaded
-const getItemImageFallback = (name, index) => {
+const getItemImageFallback = (name) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes('burger')) {
         return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&auto=format&fit=crop';
@@ -313,13 +312,11 @@ export default function AnalyticsPage() {
     useEffect(() => {
         if (!restaurantId) return;
         setLoading(true);
-        fetchAnalytics();
-    }, [restaurantId, range]);
 
-    async function fetchAnalytics() {
-        try {
-            const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
-            const menuRef = collection(db, 'restaurants', restaurantId, 'menuItems');
+        async function fetchAnalytics() {
+            try {
+                const ordersRef = collection(db, 'restaurants', restaurantId, 'orders');
+                const menuRef = collection(db, 'restaurants', restaurantId, 'menuItems');
             
             // ── Fetch Menu Items Map (To get actual uploaded images, categories, isVeg) ──
             const menuSnap = await getDocs(menuRef);
@@ -557,6 +554,9 @@ export default function AnalyticsPage() {
         }
     }
 
+    fetchAnalytics();
+}, [restaurantId, range]);
+
     function buildRevenueTrend(orders, range, startDate, now) {
         if (range === 'today') {
             const hourly = {};
@@ -653,8 +653,6 @@ export default function AnalyticsPage() {
         if (range === 'week') return 'vs previous week';
         return 'vs previous month';
     };
-
-    const currentMonthName = monthNames[new Date().getMonth()];
 
     return (
         <div className="analytics-page dashboard-theme">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     collection,
     getDocs,
@@ -31,7 +31,7 @@ export default function MenuManagementPage() {
     });
     const [menuSearchTerm, setMenuSearchTerm] = useState('');
 
-    const fetchItems = async () => {
+    const fetchItems = useCallback(async () => {
         try {
             const ref = collection(db, 'restaurants', restaurantId, 'menuItems');
             const snapshot = await getDocs(ref);
@@ -41,11 +41,11 @@ export default function MenuManagementPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [restaurantId]);
 
     useEffect(() => {
         fetchItems();
-    }, []);
+    }, [fetchItems]);
 
     const resetForm = () => {
         setForm({ name: '', description: '', category: '', price: '', image: '', isVeg: true, isAvailable: true, variants: [], addOns: [] });
