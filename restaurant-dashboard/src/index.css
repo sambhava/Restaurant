@@ -2401,14 +2401,20 @@ body {
   color: var(--text);
 }
 
-/* --- Bottom Row Grid --- */
+/* --- Bottom Row Grid & Right Column Layout --- */
 .bottom-row-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 18px;
 }
 
-@media (max-width: 768px) {
+.dashboard-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
   .bottom-row-grid {
     grid-template-columns: 1fr;
   }

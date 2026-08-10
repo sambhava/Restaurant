@@ -855,10 +855,9 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    {/* Bottom Row Grid */}
+                    {/* Bottom Row Grid (2 Cards) */}
                     <div className="bottom-row-grid">
-                        
-                        {/* Category Popularity (Replaces Customers by Location) */}
+                        {/* Category Popularity */}
                         <div className="location-card">
                             <h3 className="card-sec-title">Category Popularity</h3>
                             <div className="location-list">
@@ -880,7 +879,7 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
 
-                        {/* Trending Orders Slider (Rating Removed, Uploaded Image Enabled) */}
+                        {/* Trending Orders Slider */}
                         <div className="trending-card">
                             <div className="trending-header">
                                 <h3 className="card-sec-title">Trending Orders</h3>
@@ -907,55 +906,28 @@ export default function AnalyticsPage() {
                                 )}
                             </div>
                         </div>
-
-                        {/* Veg vs Non-Veg Preferences split (Moved in parallel to Trending Orders) */}
-                        <div className="location-card">
-                            <h3 className="card-sec-title">Dietary Preference</h3>
-                            <div className="location-list" style={{ gap: '16px' }}>
-                                <div className="location-item">
-                                    <div className="location-meta">
-                                        <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4CAF50' }}></span> Veg orders
-                                        </span>
-                                        <span className="loc-val" style={{ color: '#4CAF50', fontWeight: 700 }}>{stats.vegPercentage}%</span>
-                                    </div>
-                                    <div className="loc-bar-bg">
-                                        <div className="loc-bar-fill" style={{ width: `${stats.vegPercentage}%`, background: '#4CAF50' }}></div>
-                                    </div>
-                                </div>
-                                <div className="location-item">
-                                    <div className="location-meta">
-                                        <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E74C3C' }}></span> Non-Veg orders
-                                        </span>
-                                        <span className="loc-val" style={{ color: '#E74C3C', fontWeight: 700 }}>{100 - stats.vegPercentage}%</span>
-                                    </div>
-                                    <div className="loc-bar-bg">
-                                        <div className="loc-bar-fill" style={{ width: `${100 - stats.vegPercentage}%`, background: '#E74C3C' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
-                {/* Right Column (Leaderboard only) */}
+                {/* Right Column */}
                 <div className="dashboard-right-col">
-                    {/* Busy Tables Leaderboard with scroll bar */}
-                    <div className="team-card" style={{ minHeight: 'auto', marginBottom: '20px' }}>
-                        <h3 className="card-sec-title" style={{ marginBottom: '12px' }}>Table Activity</h3>
-                        <div className="team-list" style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {/* Table Activity Card */}
+                    <div className="location-card">
+                        <h3 className="card-sec-title" style={{ marginBottom: '14px' }}>Table Activity</h3>
+                        <div className="team-list" style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
                             {stats.tableLeaderboard.length > 0 ? (
                                 stats.tableLeaderboard.map((t, idx) => (
-                                    <div key={t.table} className="team-member-item" style={{ paddingBottom: '10px', marginBottom: '4px' }}>
-                                        <div className="footer-metric-icon" style={{ borderRadius: '50%', background: 'var(--accent-light)', borderColor: 'var(--accent)', color: 'var(--accent)', fontWeight: 700, fontSize: '12px', width: '32px', height: '32px' }}>
-                                            #{idx + 1}
+                                    <div key={t.table} className="team-member-item" style={{ paddingBottom: '10px', marginBottom: '8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div className="footer-metric-icon" style={{ borderRadius: '50%', background: 'var(--accent-light)', borderColor: 'var(--accent)', color: 'var(--accent)', fontWeight: 700, fontSize: '11px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                #{idx + 1}
+                                            </div>
+                                            <div className="member-info">
+                                                <span className="member-name" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{t.table}</span>
+                                                <span className="member-role" style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>{t.orders} orders placed</span>
+                                            </div>
                                         </div>
-                                        <div className="member-info">
-                                            <span className="member-name">{t.table}</span>
-                                            <span className="member-role">{t.orders} orders placed</span>
-                                        </div>
-                                        <span className="trending-price" style={{ fontSize: '13px' }}>
+                                        <span className="trending-price" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>
                                             ₹{t.revenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}
                                         </span>
                                     </div>
@@ -963,6 +935,35 @@ export default function AnalyticsPage() {
                             ) : (
                                 <div className="chart-empty">No tables active yet</div>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Dietary Preference Card */}
+                    <div className="location-card">
+                        <h3 className="card-sec-title" style={{ marginBottom: '14px' }}>Dietary Preference</h3>
+                        <div className="location-list" style={{ gap: '16px' }}>
+                            <div className="location-item">
+                                <div className="location-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                                    <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
+                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4CAF50' }}></span> Veg orders
+                                    </span>
+                                    <span className="loc-val" style={{ color: '#4CAF50', fontWeight: 700 }}>{stats.vegPercentage}%</span>
+                                </div>
+                                <div className="loc-bar-bg" style={{ height: '8px', background: 'var(--bg)', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div className="loc-bar-fill" style={{ width: `${stats.vegPercentage}%`, background: '#4CAF50', height: '100%', borderRadius: '100px' }}></div>
+                                </div>
+                            </div>
+                            <div className="location-item">
+                                <div className="location-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                                    <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
+                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E74C3C' }}></span> Non-Veg orders
+                                    </span>
+                                    <span className="loc-val" style={{ color: '#E74C3C', fontWeight: 700 }}>{100 - stats.vegPercentage}%</span>
+                                </div>
+                                <div className="loc-bar-bg" style={{ height: '8px', background: 'var(--bg)', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div className="loc-bar-fill" style={{ width: `${100 - stats.vegPercentage}%`, background: '#E74C3C', height: '100%', borderRadius: '100px' }}></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
