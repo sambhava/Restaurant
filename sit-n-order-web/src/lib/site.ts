@@ -10,37 +10,34 @@ export const SITE = {
   name: "Sit-N-Order",
   tagline: "Orders that start at the table.",
 
-  // TODO: replace with your real domain once registered.
-  url: "https://sitnorder.in",
+  // TODO: replace once a domain is registered. Until then the site is served
+  // from its Cloudflare Pages address, which is a working public URL.
+  url: "https://sit-n-order-web.pages.dev",
 
-  // TODO: replace with your real contact details.
-  email: "hello@sitnorder.in",
-  supportEmail: "support@sitnorder.in",
-  phone: "+91 00000 00000",
-  whatsapp: "+91 00000 00000",
+  email: "sambhavajain512@gmail.com",
+  supportEmail: "sambhavajain512@gmail.com",
+  phone: "+91 89496 84405",
+  whatsapp: "+91 89496 84405",
 
   /**
    * Legal identity. Written for a sole proprietorship — see LEGAL-CHECKLIST.md
    * for what changes if you incorporate later.
    */
   legal: {
-    // TODO: your full legal name, e.g. "Sambhav Sharma, trading as Sit-N-Order".
-    entityName: "[YOUR FULL LEGAL NAME], sole proprietor, trading as Sit-N-Order",
+    entityName: "Sambhava Jain, sole proprietor, trading as Sit-N-Order",
     entityType: "Sole Proprietorship",
-    // TODO: full registered address.
-    address: "[YOUR REGISTERED BUSINESS ADDRESS]",
-    // TODO: the city whose courts will have jurisdiction.
-    jurisdictionCity: "[YOUR CITY]",
-    jurisdictionState: "[YOUR STATE]",
+    address: "M19 Madhuban Colony, Tonk Phatak, Jaipur, Rajasthan 302015",
+    jurisdictionCity: "Jaipur",
+    jurisdictionState: "Rajasthan",
     // TODO: leave null until you register for GST. Setting this switches on
     // the GST clauses in the Terms and shows GST on the pricing receipt.
     gstin: null as string | null,
     // DPDP Act 2023 requires a named contact for data grievances.
     grievanceOfficer: {
-      name: "[YOUR NAME]",
-      email: "privacy@sitnorder.in",
+      name: "Sambhava Jain",
+      email: "sambhavajain512@gmail.com",
     },
-    lastUpdated: "10 August 2026",
+    lastUpdated: "11 August 2026",
   },
 
   /**
@@ -49,9 +46,7 @@ export const SITE = {
    */
   plan: {
     name: "Full access",
-    // TODO: confirm your price. This figure appears on /pricing and in the
-    // Terms — the two must not disagree.
-    priceMonthly: 1499,
+    priceMonthly: 999,
     currency: "₹",
     unit: "per outlet, per month",
     gstRatePercent: 18,
@@ -66,8 +61,7 @@ export const SITE = {
   },
 
   /** Where the dashboard is deployed — the login page hands off here. */
-  // TODO: point at your deployed dashboard URL.
-  dashboardUrl: "https://dashboard.sitnorder.in",
+  dashboardUrl: "https://restaurant-dashboard-sno.pages.dev",
 } as const;
 
 export const LEGAL_PAGES = [
