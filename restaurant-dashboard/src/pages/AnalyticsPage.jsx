@@ -753,200 +753,226 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
-            {/* Main Content Layout (100% Full Width Utilization) */}
-            <div className="analytics-full-layout" style={{ display: 'flex', flexDirection: 'column', gap: '22px', width: '100%' }}>
+            {/* Main Content Grid */}
+            <div className="dashboard-grid">
                 
-                {/* 1. Top Metrics Grid (4 Cards across full width) */}
-                <div className="metrics-row-4col">
-                    <div className="metric-card">
-                        <div className="metric-header">
-                            <span className="metric-title">Total Revenue</span>
-                            <span className="metric-icon revenue-bg">🪙</span>
+                {/* Left/Center Column */}
+                <div className="dashboard-left-col">
+                    
+                    {/* Top Stats Cards */}
+                    <div className="metrics-row">
+                        <div className="metric-card">
+                            <div className="metric-header">
+                                <span className="metric-title">Total Revenue</span>
+                                <span className="metric-icon revenue-bg">🪙</span>
+                            </div>
+                            <div className="metric-body">
+                                <h2 className="metric-value">₹{stats.revenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
+                                <div className={`metric-trend ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
+                                    <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
+                                    <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
+                                    <span className="trend-subtext">{getTrendSubtext()}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="metric-body">
-                            <h2 className="metric-value">₹{stats.revenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
-                            <div className={`metric-trend ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
-                                <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
-                                <span className="trend-subtext">{getTrendSubtext()}</span>
+
+                        <div className="metric-card">
+                            <div className="metric-header">
+                                <span className="metric-title">Total Customers</span>
+                                <span className="metric-icon customers-bg">👥</span>
+                            </div>
+                            <div className="metric-body">
+                                <h2 className="metric-value">{Math.round(stats.orderCount * 2.4).toLocaleString('en-IN')}</h2>
+                                <div className={`metric-trend ${stats.ordersTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
+                                    <span className="trend-arrow">{stats.ordersTrendPct >= 0 ? '↗' : '↘'}</span>
+                                    <span className="trend-percentage">{Math.abs(stats.ordersTrendPct).toFixed(1)}%</span>
+                                    <span className="trend-subtext">{getTrendSubtext()}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="metric-card">
+                            <div className="metric-header">
+                                <span className="metric-title">Total Orders</span>
+                                <span className="metric-icon orders-bg">📋</span>
+                            </div>
+                            <div className="metric-body">
+                                <h2 className="metric-value">{stats.orderCount}</h2>
+                                <div className={`metric-trend ${stats.ordersTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
+                                    <span className="trend-arrow">{stats.ordersTrendPct >= 0 ? '↗' : '↘'}</span>
+                                    <span className="trend-percentage">{Math.abs(stats.ordersTrendPct).toFixed(1)}%</span>
+                                    <span className="trend-subtext">{getTrendSubtext()}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="metric-card">
-                        <div className="metric-header">
-                            <span className="metric-title">Total Customers</span>
-                            <span className="metric-icon customers-bg">👥</span>
+                    {/* Sales Over time / Revenue Card */}
+                    <div className="monthly-revenue-card sales-chart-card">
+                        <div className="monthly-rev-header">
+                            <div className="monthly-rev-title-area">
+                                <h2 className="sales-hero-value">
+                                    ₹{stats.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </h2>
+                                <p className="sales-hero-subtitle">Sales Over time</p>
+                            </div>
+                            <div className="monthly-rev-header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div className={`sales-trend-pill ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
+                                    <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
+                                    <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
+                                    <span className="trend-subtext">{getTrendSubtext()}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="metric-body">
-                            <h2 className="metric-value">{Math.round(stats.orderCount * 2.4).toLocaleString('en-IN')}</h2>
-                            <div className={`metric-trend ${stats.ordersTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                <span className="trend-arrow">{stats.ordersTrendPct >= 0 ? '↗' : '↘'}</span>
-                                <span className="trend-percentage">{Math.abs(stats.ordersTrendPct).toFixed(1)}%</span>
-                                <span className="trend-subtext">{getTrendSubtext()}</span>
+
+                        <div className="bezier-chart-container">
+                            <SmoothLineChart data={stats.revenueTrend} color="#34D399" height={200} />
+                        </div>
+
+                        {/* Subtle Metrics Footer */}
+                        <div className="monthly-metrics-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '4px' }}>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">🪙</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Avg. Order Value</span>
+                                    <span className="footer-metric-value">₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">📈</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Avg. Monthly Rev.</span>
+                                    <span className="footer-metric-value">₹{Math.round(stats.avgMonthlyRevenue).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">📋</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Total Orders</span>
+                                    <span className="footer-metric-value">{stats.orderCount}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="metric-card">
-                        <div className="metric-header">
-                            <span className="metric-title">Total Orders</span>
-                            <span className="metric-icon orders-bg">📋</span>
-                        </div>
-                        <div className="metric-body">
-                            <h2 className="metric-value">{stats.orderCount}</h2>
-                            <div className={`metric-trend ${stats.ordersTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                <span className="trend-arrow">{stats.ordersTrendPct >= 0 ? '↗' : '↘'}</span>
-                                <span className="trend-percentage">{Math.abs(stats.ordersTrendPct).toFixed(1)}%</span>
-                                <span className="trend-subtext">{getTrendSubtext()}</span>
+                    {/* Bottom Row Grid */}
+                    <div className="bottom-row-grid">
+                        
+                        {/* Category Popularity (Replaces Customers by Location) */}
+                        <div className="location-card">
+                            <h3 className="card-sec-title">Category Popularity</h3>
+                            <div className="location-list">
+                                {stats.categoryBreakdown.length > 0 ? (
+                                    stats.categoryBreakdown.map((cat, i) => (
+                                        <div className="location-item" key={cat.label}>
+                                            <div className="location-meta">
+                                                <span className="loc-name">{cat.label}</span>
+                                                <span className="loc-val">{cat.value} items ({cat.percentage}%)</span>
+                                            </div>
+                                            <div className="loc-bar-bg">
+                                                <div className={`loc-bar-fill ${barColors[i % barColors.length]}`} style={{ width: `${cat.percentage}%` }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="chart-empty">No category data yet</div>
+                                )}
                             </div>
                         </div>
-                    </div>
 
-                    <div className="metric-card">
-                        <div className="metric-header">
-                            <span className="metric-title">Avg. Order Value</span>
-                            <span className="metric-icon revenue-bg" style={{ background: 'rgba(16, 185, 129, 0.12)' }}>💳</span>
+                        {/* Trending Orders Slider (Rating Removed, Uploaded Image Enabled) */}
+                        <div className="trending-card">
+                            <div className="trending-header">
+                                <h3 className="card-sec-title">Trending Orders</h3>
+                                <div className="slider-arrows">
+                                    <button className="arrow-btn" onClick={prevTrending}>←</button>
+                                    <button className="arrow-btn" onClick={nextTrending}>→</button>
+                                </div>
+                            </div>
+                            
+                            <div className="trending-items-slider">
+                                {currentTrendingItem ? (
+                                    <div className="trending-item-card-inner">
+                                        <div className="trending-img-container">
+                                            <img src={currentTrendingItem.image} alt={currentTrendingItem.name} />
+                                        </div>
+                                        <h4 className="trending-item-name">{currentTrendingItem.name}</h4>
+                                        <div className="trending-item-meta">
+                                            <span className="trending-price">₹{currentTrendingItem.price}</span>
+                                            <span className="trending-orders-count">Orders {currentTrendingItem.orders}</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="chart-empty">No orders items yet</div>
+                                )}
+                            </div>
                         </div>
-                        <div className="metric-body">
-                            <h2 className="metric-value">₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}</h2>
-                            <div className={`metric-trend ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
-                                <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
-                                <span className="trend-subtext">{getTrendSubtext()}</span>
+
+                        {/* Veg vs Non-Veg Preferences split (Moved in parallel to Trending Orders) */}
+                        <div className="location-card">
+                            <h3 className="card-sec-title">Dietary Preference</h3>
+                            <div className="location-list" style={{ gap: '16px' }}>
+                                <div className="location-item">
+                                    <div className="location-meta">
+                                        <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4CAF50' }}></span> Veg orders
+                                        </span>
+                                        <span className="loc-val" style={{ color: '#4CAF50', fontWeight: 700 }}>{stats.vegPercentage}%</span>
+                                    </div>
+                                    <div className="loc-bar-bg">
+                                        <div className="loc-bar-fill" style={{ width: `${stats.vegPercentage}%`, background: '#4CAF50' }}></div>
+                                    </div>
+                                </div>
+                                <div className="location-item">
+                                    <div className="location-meta">
+                                        <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E74C3C' }}></span> Non-Veg orders
+                                        </span>
+                                        <span className="loc-val" style={{ color: '#E74C3C', fontWeight: 700 }}>{100 - stats.vegPercentage}%</span>
+                                    </div>
+                                    <div className="loc-bar-bg">
+                                        <div className="loc-bar-fill" style={{ width: `${100 - stats.vegPercentage}%`, background: '#E74C3C' }}></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 2. Sales Over time Hero Graph Card (Full Width) */}
-                <div className="monthly-revenue-card sales-chart-card" style={{ width: '100%' }}>
-                    <div className="monthly-rev-header">
-                        <div className="monthly-rev-title-area">
-                            <h2 className="sales-hero-value">
-                                ₹{stats.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </h2>
-                            <p className="sales-hero-subtitle">Sales Over time</p>
+                {/* Right Column (Table Activity Card Full Height) */}
+                <div className="dashboard-right-col">
+                    <div className="table-activity-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 className="card-sec-title">Table Activity</h3>
+                            {stats.tableLeaderboard.length > 0 && (
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)', padding: '4px 10px', borderRadius: '100px', border: '1px solid var(--border)' }}>
+                                    {stats.tableLeaderboard.length} Active
+                                </span>
+                            )}
                         </div>
-                        <div className="monthly-rev-header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div className={`sales-trend-pill ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
-                                <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
-                                <span className="trend-subtext">{getTrendSubtext()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bezier-chart-container">
-                        <SmoothLineChart data={stats.revenueTrend} color="#34D399" height={220} />
-                    </div>
-                </div>
-
-                {/* 3. Bottom Insights Row (4 Cards across full width) */}
-                <div className="analytics-bottom-4grid">
-                    {/* Table Activity Card */}
-                    <div className="location-card" style={{ height: '100%' }}>
-                        <h3 className="card-sec-title" style={{ marginBottom: '14px' }}>Table Activity</h3>
-                        <div className="team-list" style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
+                        <div className="table-activity-list">
                             {stats.tableLeaderboard.length > 0 ? (
                                 stats.tableLeaderboard.map((t, idx) => (
-                                    <div key={t.table} className="team-member-item" style={{ paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div className="footer-metric-icon" style={{ borderRadius: '50%', background: 'var(--accent-light)', borderColor: 'var(--accent)', color: 'var(--accent)', fontWeight: 700, fontSize: '11px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <div key={t.table} className="table-activity-item">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ borderRadius: '50%', background: 'rgba(52, 211, 153, 0.12)', border: '1px solid rgba(52, 211, 153, 0.25)', color: '#059669', fontWeight: 700, fontSize: '12px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                                 #{idx + 1}
                                             </div>
                                             <div className="member-info">
-                                                <span className="member-name" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{t.table}</span>
-                                                <span className="member-role" style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block' }}>{t.orders} orders</span>
+                                                <span className="member-name" style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)', display: 'block' }}>{t.table}</span>
+                                                <span className="member-role" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.orders} {t.orders === 1 ? 'order' : 'orders'} placed</span>
                                             </div>
                                         </div>
-                                        <span className="trending-price" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>
+                                        <span className="trending-price" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
                                             ₹{t.revenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}
                                         </span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="chart-empty">No tables active yet</div>
+                                <div className="chart-empty" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
+                                    No tables active yet
+                                </div>
                             )}
-                        </div>
-                    </div>
-
-                    {/* Category Popularity Card */}
-                    <div className="location-card" style={{ height: '100%' }}>
-                        <h3 className="card-sec-title" style={{ marginBottom: '14px' }}>Category Popularity</h3>
-                        <div className="location-list">
-                            {stats.categoryBreakdown.length > 0 ? (
-                                stats.categoryBreakdown.map((cat, i) => (
-                                    <div className="location-item" key={cat.label}>
-                                        <div className="location-meta">
-                                            <span className="loc-name">{cat.label}</span>
-                                            <span className="loc-val">{cat.value} items ({cat.percentage}%)</span>
-                                        </div>
-                                        <div className="loc-bar-bg">
-                                            <div className={`loc-bar-fill ${barColors[i % barColors.length]}`} style={{ width: `${cat.percentage}%` }}></div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="chart-empty">No category data yet</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Trending Orders Card */}
-                    <div className="trending-card" style={{ height: '100%' }}>
-                        <div className="trending-header">
-                            <h3 className="card-sec-title">Trending Orders</h3>
-                            <div className="slider-arrows">
-                                <button className="arrow-btn" onClick={prevTrending}>←</button>
-                                <button className="arrow-btn" onClick={nextTrending}>→</button>
-                            </div>
-                        </div>
-                        
-                        <div className="trending-items-slider">
-                            {currentTrendingItem ? (
-                                <div className="trending-item-card-inner">
-                                    <div className="trending-img-container">
-                                        <img src={currentTrendingItem.image} alt={currentTrendingItem.name} />
-                                    </div>
-                                    <h4 className="trending-item-name">{currentTrendingItem.name}</h4>
-                                    <div className="trending-item-meta">
-                                        <span className="trending-price">₹{currentTrendingItem.price}</span>
-                                        <span className="trending-orders-count">Orders {currentTrendingItem.orders}</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="chart-empty">No orders items yet</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Dietary Preference Card */}
-                    <div className="location-card" style={{ height: '100%' }}>
-                        <h3 className="card-sec-title" style={{ marginBottom: '14px' }}>Dietary Preference</h3>
-                        <div className="location-list" style={{ gap: '16px' }}>
-                            <div className="location-item">
-                                <div className="location-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                                    <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4CAF50' }}></span> Veg orders
-                                    </span>
-                                    <span className="loc-val" style={{ color: '#4CAF50', fontWeight: 700 }}>{stats.vegPercentage}%</span>
-                                </div>
-                                <div className="loc-bar-bg" style={{ height: '8px', background: 'var(--bg)', borderRadius: '100px', overflow: 'hidden' }}>
-                                    <div className="loc-bar-fill" style={{ width: `${stats.vegPercentage}%`, background: '#4CAF50', height: '100%', borderRadius: '100px' }}></div>
-                                </div>
-                            </div>
-                            <div className="location-item">
-                                <div className="location-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                                    <span className="loc-name" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E74C3C' }}></span> Non-Veg orders
-                                    </span>
-                                    <span className="loc-val" style={{ color: '#E74C3C', fontWeight: 700 }}>{100 - stats.vegPercentage}%</span>
-                                </div>
-                                <div className="loc-bar-bg" style={{ height: '8px', background: 'var(--bg)', borderRadius: '100px', overflow: 'hidden' }}>
-                                    <div className="loc-bar-fill" style={{ width: `${100 - stats.vegPercentage}%`, background: '#E74C3C', height: '100%', borderRadius: '100px' }}></div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
