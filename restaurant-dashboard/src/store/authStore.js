@@ -53,28 +53,29 @@ const useAuthStore = create((set, get) => ({
                     
                     // Listen to profile changes in real-time
                     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-                        let restId = 'rest-2';
-                        let restName = 'Pinch Of Salt';
-                        let profile = { email: user.email, restaurantId: restId, restaurantName: restName, role: 'owner' };
+                        let restId = localStorage.getItem('restaurantId') || 'rest-2';
+                        let restName = localStorage.getItem('restaurantName') || 'Pinch Of Salt';
 
                         if (docSnap.exists()) {
                             const data = docSnap.data();
                             if (data.restaurantName) restName = data.restaurantName;
+                            if (data.restaurantId) restId = data.restaurantId;
                         }
 
+                        const profile = { email: user.email, restaurantId: restId, restaurantName: restName, role: 'owner' };
                         const userObj = { uid: user.uid, email: user.email };
 
                         set({
                             user: userObj,
                             userProfile: profile,
-                            restaurantId: 'rest-2',
+                            restaurantId: restId,
                             restaurantName: restName,
                             loading: false,
                             error: null,
                         });
 
                         localStorage.setItem('authUser', JSON.stringify(userObj));
-                        localStorage.setItem('restaurantId', 'rest-2');
+                        localStorage.setItem('restaurantId', restId);
                         localStorage.setItem('restaurantName', restName);
                     }, (err) => {
                         console.error("Profile snapshot listener error:", err);

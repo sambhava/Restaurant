@@ -60,7 +60,13 @@ export default function OrderConfirmation() {
                 {/* Actions */}
                 <button
                     className="order-more-btn"
-                    onClick={() => navigate(-2)}
+                    onClick={() => {
+                        if (window.history.length > 2) {
+                            navigate(-2);
+                        } else {
+                            navigate('/order' + window.location.search);
+                        }
+                    }}
                 >
                     Order More Items
                 </button>

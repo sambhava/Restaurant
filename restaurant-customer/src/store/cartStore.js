@@ -17,7 +17,7 @@ const useCartStore = create((set, get) => ({
             key += `__${item.selectedVariant}`;
         }
         if (item.selectedAddOns && item.selectedAddOns.length > 0) {
-            key += `__${item.selectedAddOns.sort().join('_')}`;
+            key += `__${[...item.selectedAddOns].sort().join('_')}`;
         }
         return key;
     },
