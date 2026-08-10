@@ -30,50 +30,64 @@ function formatDate(d) {
 }
 
 // ─── SVG Bezier Curve Line Chart ──────────────────────────
-function SmoothLineChart({ data, color = '#E8A54B', height = 180 }) {
+function SmoothLineChart({ data, color = '#10B981', height = 210 }) {
     if (!data || data.length === 0) {
-        return <div className="chart-empty">No data for this range</div>;
+        return (
+            <div className="chart-empty" style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
+                No data for this range
+            </div>
+        );
     }
+
     const maxVal = Math.max(...data.map(d => d.value), 1);
-    const paddingX = 40;
-    const paddingY = 25;
-    const chartW = 550;
-    const chartH = height - 20;
+    const paddingX = 35;
+    const paddingTop = 25;
+    const paddingBottom = 35;
+    const chartW = 600;
+    const chartH = height - paddingBottom;
+    const drawableH = chartH - paddingTop;
 
     const points = data.map((d, i) => ({
         x: paddingX + (i / Math.max(data.length - 1, 1)) * (chartW - paddingX * 2),
-        y: chartH - (d.value / maxVal) * (chartH - paddingY * 2) - paddingY,
+        y: chartH - (d.value / maxVal) * drawableH,
     }));
 
-    // Generate cubic Bezier path
+    // Natural Smooth Spline curve path
     let pathD = '';
     if (points.length > 0) {
-        pathD = `M ${points[0].x} ${points[0].y}`;
-        for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[i];
-            const p1 = points[i + 1];
-            const cpX1 = p0.x + (p1.x - p0.x) / 2;
-            const cpY1 = p0.y;
-            const cpX2 = p0.x + (p1.x - p0.x) / 2;
-            const cpY2 = p1.y;
-            pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+        pathD = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+        if (points.length === 2) {
+            pathD += ` L ${points[1].x.toFixed(1)} ${points[1].y.toFixed(1)}`;
+        } else if (points.length > 2) {
+            const tension = 0.22;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = i === 0 ? points[0] : points[i - 1];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = i + 2 < points.length ? points[i + 2] : p2;
+
+                const cp1x = p1.x + (p2.x - p0.x) * tension;
+                const cp1y = p1.y + (p2.y - p0.y) * tension;
+                const cp2x = p2.x - (p3.x - p1.x) * tension;
+                const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+                pathD += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+            }
         }
     }
-    const areaD = pathD ? pathD + ` L ${points[points.length - 1].x} ${chartH} L ${points[0].x} ${chartH} Z` : '';
 
-    // Interactive pointer state (default to the last point)
+    const areaD = pathD ? `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${chartH} L ${points[0].x.toFixed(1)} ${chartH} Z` : '';
+
+    // Interactive pointer state (default to last point)
     const [activeIndex, setActiveIndex] = useState(points.length - 1);
 
-    // Make sure activeIndex stays in bounds if data length changes
-    if (activeIndex >= points.length) {
-        setActiveIndex(points.length - 1);
-    }
+    // Keep activeIndex within range
+    const activeIdxClamped = Math.min(Math.max(0, activeIndex), points.length - 1);
+    const activePoint = points[activeIdxClamped] || { x: 0, y: 0 };
+    const activeData = data[activeIdxClamped] || { label: '', value: 0 };
 
-    const activePoint = points[activeIndex] || points[points.length - 1] || { x: 0, y: 0 };
-    const activeData = data[activeIndex] || data[data.length - 1] || { label: '', value: 0 };
-
-    const handlePointerMove = (clientX, rect, svgWidth) => {
-        const relativeX = (clientX / rect.width) * svgWidth;
+    const handlePointerMove = (clientX, rect) => {
+        const relativeX = (clientX / rect.width) * chartW;
         let closestIdx = 0;
         let minDiff = Infinity;
         points.forEach((p, idx) => {
@@ -90,7 +104,7 @@ function SmoothLineChart({ data, color = '#E8A54B', height = 180 }) {
         const svg = e.currentTarget;
         const rect = svg.getBoundingClientRect();
         const clientX = e.clientX - rect.left;
-        handlePointerMove(clientX, rect, chartW);
+        handlePointerMove(clientX, rect);
     };
 
     const handleTouchMove = (e) => {
@@ -98,14 +112,29 @@ function SmoothLineChart({ data, color = '#E8A54B', height = 180 }) {
             const svg = e.currentTarget;
             const rect = svg.getBoundingClientRect();
             const clientX = e.touches[0].clientX - rect.left;
-            handlePointerMove(clientX, rect, chartW);
+            handlePointerMove(clientX, rect);
         }
     };
 
-    // Calculate clamped tooltip coordinates
-    const tooltipX = Math.max(10, Math.min(chartW - 130, activePoint.x - 60));
-    const isNearTop = activePoint.y < 50;
-    const tooltipY = isNearTop ? activePoint.y + 15 : activePoint.y - 42;
+    const tooltipWidth = 120;
+    const tooltipX = Math.max(10, Math.min(chartW - tooltipWidth - 10, activePoint.x - tooltipWidth / 2));
+    const isNearTop = activePoint.y < 65;
+    const tooltipY = isNearTop ? activePoint.y + 16 : activePoint.y - 48;
+
+    // Filter label steps to render ~3-5 clean X-axis labels (like 8:00 AM, 4:00 PM, 12:00 PM)
+    const totalPoints = points.length;
+    let labelIndices = [];
+    if (totalPoints <= 5) {
+        labelIndices = points.map((_, i) => i);
+    } else {
+        const step = (totalPoints - 1) / 3;
+        labelIndices = [
+            0,
+            Math.round(step),
+            Math.round(step * 2),
+            totalPoints - 1
+        ];
+    }
 
     return (
         <div className="chart-container" style={{ position: 'relative', width: '100%' }}>
@@ -114,70 +143,115 @@ function SmoothLineChart({ data, color = '#E8A54B', height = 180 }) {
                 className="line-chart-svg"
                 onMouseMove={handleMouseMove}
                 onTouchMove={handleTouchMove}
-                style={{ cursor: 'crosshair', overflow: 'visible' }}
+                style={{ cursor: 'crosshair', overflow: 'visible', width: '100%', height: 'auto' }}
             >
                 <defs>
-                    <linearGradient id="smoothAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity="0.15" />
+                    <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+                        <stop offset="60%" stopColor={color} stopOpacity="0.08" />
                         <stop offset="100%" stopColor={color} stopOpacity="0.0" />
                     </linearGradient>
+                    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="2" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
                 </defs>
 
                 {/* Subgrid horizontal lines */}
                 {[0, 0.5, 1].map((frac, i) => {
-                    const y = chartH - frac * (chartH - paddingY * 2) - paddingY;
+                    const y = paddingTop + frac * drawableH;
                     return (
-                        <line key={i} x1={paddingX} y1={y} x2={chartW - paddingX} y2={y} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3 3" />
+                        <line 
+                            key={i} 
+                            x1={paddingX} 
+                            y1={y} 
+                            x2={chartW - paddingX} 
+                            y2={y} 
+                            stroke="var(--border)" 
+                            strokeWidth="1" 
+                            strokeDasharray="4 4" 
+                            opacity="0.6" 
+                        />
                     );
                 })}
 
-                {/* Area fill */}
-                {areaD && <path d={areaD} fill="url(#smoothAreaGrad)" />}
+                {/* Gradient Area Fill */}
+                {areaD && <path d={areaD} fill="url(#salesGrad)" />}
 
-                {/* Curve Line */}
-                {pathD && <path d={pathD} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+                {/* Smooth Curve Line */}
+                {pathD && (
+                    <path 
+                        d={pathD} 
+                        fill="none" 
+                        stroke={color} 
+                        strokeWidth="2.8" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        filter="url(#softGlow)"
+                    />
+                )}
 
                 {/* Vertical Indicator Guide Line */}
                 {points.length > 0 && (
                     <line 
                         x1={activePoint.x} 
-                        y1={paddingY} 
+                        y1={paddingTop} 
                         x2={activePoint.x} 
                         y2={chartH} 
-                        stroke="var(--text-dim)" 
-                        strokeWidth="1" 
-                        strokeDasharray="4 4" 
-                        opacity="0.6"
+                        stroke={color} 
+                        strokeWidth="1.2" 
+                        strokeDasharray="3 3" 
+                        opacity="0.4" 
                     />
                 )}
 
-                {/* Intersect Tooltip Point */}
+                {/* Active Tooltip & Intersection Point */}
                 {points.length > 0 && (
-                    <g style={{ transition: 'all 0.1s ease-out' }}>
-                        <circle cx={activePoint.x} cy={activePoint.y} r="6" fill="#FFFFFF" stroke={color} strokeWidth="3" />
-                        {/* Tooltip box */}
+                    <g style={{ transition: 'transform 0.08s ease-out' }}>
+                        {/* Outer pulse aura */}
+                        <circle cx={activePoint.x} cy={activePoint.y} r="8" fill={color} opacity="0.25" />
+                        {/* Core Dot */}
+                        <circle cx={activePoint.x} cy={activePoint.y} r="5" fill="#FFFFFF" stroke={color} strokeWidth="2.5" />
+                        
+                        {/* Floating Tooltip */}
                         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
-                            <rect width="120" height="32" rx="6" fill="#1C1B1F" opacity="0.9" />
-                            <text x="60" y="14" textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="500" opacity="0.8">
+                            <rect 
+                                width={tooltipWidth} 
+                                height="38" 
+                                rx="8" 
+                                fill="#0F172A" 
+                                opacity="0.94"
+                                style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}
+                            />
+                            <text x={tooltipWidth / 2} y="15" textAnchor="middle" fill="#94A3B8" fontSize="10" fontWeight="500">
                                 {activeData.date || activeData.label || 'Revenue'}
                             </text>
-                            <text x="60" y="24" textAnchor="middle" fill="#FFFFFF" fontSize="9" fontWeight="700">
+                            <text x={tooltipWidth / 2} y="30" textAnchor="middle" fill="#FFFFFF" fontSize="12" fontWeight="700">
                                 ₹{Math.round(activeData.value).toLocaleString('en-IN')}
                             </text>
                         </g>
                     </g>
                 )}
 
-                {/* Labels */}
-                {points.map((p, i) => (
-                    <g key={i}>
-                        {(data.length <= 12 || i % Math.ceil(data.length / 8) === 0) && (
-                            <text x={p.x} y={chartH + 12} textAnchor="middle" fill="var(--text-dim)" fontSize="9" fontWeight="500">
-                                {data[i].label}
-                            </text>
-                        )}
-                    </g>
-                ))}
+                {/* X Axis Labels */}
+                {labelIndices.map((idx) => {
+                    const p = points[idx];
+                    const label = data[idx]?.label || '';
+                    if (!p) return null;
+                    return (
+                        <text 
+                            key={idx} 
+                            x={p.x} 
+                            y={chartH + 22} 
+                            textAnchor="middle" 
+                            fill="var(--text-dim)" 
+                            fontSize="11" 
+                            fontWeight="500"
+                        >
+                            {label}
+                        </text>
+                    );
+                })}
             </svg>
         </div>
     );
@@ -743,29 +817,51 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    {/* Monthly Revenue Card */}
-                    <div className="monthly-revenue-card">
+                    {/* Sales Over time / Revenue Card */}
+                    <div className="monthly-revenue-card sales-chart-card">
                         <div className="monthly-rev-header">
                             <div className="monthly-rev-title-area">
-                                <h3 className="card-sec-title">Revenue Analysis</h3>
-                                <div className="avg-monthly-value-box">
-                                    <span className="avg-monthly-label">Average Monthly Income ({currentYear})</span>
-                                    <h2 className="avg-monthly-value">₹{stats.avgMonthlyRevenue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
-                                    <div className={`monthly-growth ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
-                                        <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
-                                        <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
-                                        <span className="trend-subtext">vs previous period</span>
-                                    </div>
-                                </div>
+                                <h2 className="sales-hero-value">
+                                    ₹{stats.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </h2>
+                                <p className="sales-hero-subtitle">Sales Over time</p>
                             </div>
-                            <div className="monthly-rev-chart-labels">
-                                <span className="income-badge">Total income</span>
-                                <h4 className="income-value">₹{stats.revenue.toLocaleString('en-IN', {maximumFractionDigits:0})}</h4>
+                            <div className="monthly-rev-header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div className={`sales-trend-pill ${stats.revenueTrendPct >= 0 ? 'trend-up' : 'trend-down'}`}>
+                                    <span className="trend-arrow">{stats.revenueTrendPct >= 0 ? '↗' : '↘'}</span>
+                                    <span className="trend-percentage">{Math.abs(stats.revenueTrendPct).toFixed(1)}%</span>
+                                    <span className="trend-subtext">{getTrendSubtext()}</span>
+                                </div>
                             </div>
                         </div>
 
                         <div className="bezier-chart-container">
-                            <SmoothLineChart data={stats.revenueTrend} color="#E8A54B" height={180} />
+                            <SmoothLineChart data={stats.revenueTrend} color="#10B981" height={210} />
+                        </div>
+
+                        {/* Subtle Metrics Footer */}
+                        <div className="monthly-metrics-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '4px' }}>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">🪙</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Avg. Order Value</span>
+                                    <span className="footer-metric-value">₹{Math.round(stats.avgOrderValue).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">📈</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Avg. Monthly Rev.</span>
+                                    <span className="footer-metric-value">₹{Math.round(stats.avgMonthlyRevenue).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+                            <div className="footer-metric">
+                                <div className="footer-metric-icon">📋</div>
+                                <div className="footer-metric-info">
+                                    <span className="footer-metric-label">Total Orders</span>
+                                    <span className="footer-metric-value">{stats.orderCount}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
