@@ -43,9 +43,9 @@ export default function SignupPage() {
         </p>
         <p className="mt-4 text-sm text-ink-soft">
           Already set up?{" "}
-          <Link href="/login" className="text-amber-deep">
+          <a href={`${SITE.dashboardUrl}/login`} className="text-amber-deep">
             Sign in
-          </Link>
+          </a>
         </p>
       </div>
 

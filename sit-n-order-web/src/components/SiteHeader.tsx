@@ -56,9 +56,9 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-2 sm:flex">
-          <Link href="/login" className="btn btn-secondary !px-4 !py-2 text-sm">
+          <a href={`${SITE.dashboardUrl}/login`} className="btn btn-secondary !px-4 !py-2 text-sm">
             Sign in
-          </Link>
+          </a>
           <Link href="/signup" className="btn btn-primary !px-4 !py-2 text-sm">
             Get started
           </Link>
@@ -110,13 +110,13 @@ export function SiteHeader() {
             ))}
             <hr className="my-1 border-rule" />
             <div className="flex flex-col gap-3">
-              <Link
-                href="/login"
+              <a
+                href={`${SITE.dashboardUrl}/login`}
                 onClick={() => setIsOpen(false)}
                 className="btn btn-secondary w-full justify-center !py-2.5 text-center"
               >
                 Sign in
-              </Link>
+              </a>
               <Link
                 href="/signup"
                 onClick={() => setIsOpen(false)}

@@ -21,15 +21,21 @@ export function SiteFooter() {
           </h2>
           <ul className="space-y-2 text-sm">
             {[
-              { href: "/features", label: "Features" },
-              { href: "/pricing", label: "Pricing" },
-              { href: "/signup", label: "Get started" },
-              { href: "/login", label: "Sign in" },
+              { href: "/features", label: "Features", isExternal: false },
+              { href: "/pricing", label: "Pricing", isExternal: false },
+              { href: "/signup", label: "Get started", isExternal: false },
+              { href: `${SITE.dashboardUrl}/login`, label: "Sign in", isExternal: true },
             ].map((l) => (
               <li key={l.href}>
-                <Link href={l.href} className="text-ink-soft no-underline hover:text-ink">
-                  {l.label}
-                </Link>
+                {l.isExternal ? (
+                  <a href={l.href} className="text-ink-soft no-underline hover:text-ink">
+                    {l.label}
+                  </a>
+                ) : (
+                  <Link href={l.href} className="text-ink-soft no-underline hover:text-ink">
+                    {l.label}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
