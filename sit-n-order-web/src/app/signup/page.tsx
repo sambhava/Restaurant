@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SignupForm } from "@/components/SignupForm";
 import { SITE, formatINR } from "@/lib/site";
 
