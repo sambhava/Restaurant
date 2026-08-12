@@ -18,6 +18,14 @@ import { execFileSync } from "node:child_process";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
+// A token can be supplied so this works in a shell that has no interactive
+// Vercel session (CI, or a sandboxed environment with a different HOME).
+const tokenArg = process.argv.find((a) => a.startsWith("--token="));
+const scopeArg = process.argv.find((a) => a.startsWith("--scope="));
+const extra = [];
+if (tokenArg) extra.push("--token", tokenArg.slice(8));
+if (scopeArg) extra.push("--scope", scopeArg.slice(8));
+
 if (!existsSync(".env.local")) {
   console.error("No .env.local here. Run this from sit-n-order-web/.");
   process.exit(1);
@@ -58,7 +66,7 @@ for (const { name, value } of vars) {
   try {
     // Remove any existing value first — `vercel env add` refuses to overwrite.
     try {
-      execFileSync("vercel", ["env", "rm", name, "production", "--yes"], {
+      execFileSync("vercel", ["env", "rm", name, "production", "--yes", ...extra], {
         stdio: "pipe",
         shell: true,
       });
@@ -68,7 +76,7 @@ for (const { name, value } of vars) {
 
     // The value arrives on stdin, so it never appears in the process list or
     // shell history — which matters for the private key and admin token.
-    execFileSync("vercel", ["env", "add", name, "production"], {
+    execFileSync("vercel", ["env", "add", name, "production", ...extra], {
       input: value,
       stdio: ["pipe", "pipe", "pipe"],
       shell: true,

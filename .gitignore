@@ -13,3 +13,6 @@ users_auth.backup.json
 # Firebase service-account keys. These bypass every security rule.
 *serviceAccount*.json
 *-firebase-adminsdk-*.json
+
+# Vercel deploy token - never commit
+.vercel-token

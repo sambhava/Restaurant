@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { SITE } from "@/lib/site";
 
@@ -33,6 +36,8 @@ const NAV = [
 ];
 
 export function SiteHeader() {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur-md">
       <div className="shell flex h-16 items-center justify-between gap-4">
@@ -50,7 +55,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 sm:flex">
           <Link href="/login" className="btn btn-secondary !px-4 !py-2 text-sm">
             Sign in
           </Link>
@@ -58,7 +63,71 @@ export function SiteHeader() {
             Get started
           </Link>
         </div>
+
+        {/* Mobile Hamburger Toggle */}
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rule text-ink hover:bg-paper-2 sm:hidden"
+          aria-expanded={isOpen}
+          aria-label="Toggle menu"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {isOpen ? (
+              <path d="M18 6L6 18M6 6l12 12" />
+            ) : (
+              <path d="M4 12h16M4 6h16M4 18h16" />
+            )}
+          </svg>
+        </button>
       </div>
+
+      {/* Mobile Drawer Menu */}
+      {isOpen && (
+        <nav
+          aria-label="Mobile main navigation"
+          className="border-t border-rule bg-paper px-6 py-5 shadow-lg sm:hidden"
+        >
+          <div className="flex flex-col gap-4">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className="py-1 text-base font-medium text-ink no-underline hover:text-amber-deep"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <hr className="my-1 border-rule" />
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/login"
+                onClick={() => setIsOpen(false)}
+                className="btn btn-secondary w-full justify-center !py-2.5 text-center"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                onClick={() => setIsOpen(false)}
+                className="btn btn-primary w-full justify-center !py-2.5 text-center"
+              >
+                Get started
+              </Link>
+            </div>
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

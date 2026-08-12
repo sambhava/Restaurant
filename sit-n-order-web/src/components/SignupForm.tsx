@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -265,7 +265,7 @@ export function SignupForm() {
           <div>
             <label className={label} htmlFor="fssaiLicense">
               FSSAI licence number{" "}
-              <span className="font-normal text-ink-dim">â€” optional</span>
+              <span className="font-normal text-ink-dim">— optional</span>
             </label>
             <input id="fssaiLicense" className="input font-mono"
               value={values.fssaiLicense} inputMode="numeric"
@@ -278,7 +278,7 @@ export function SignupForm() {
           </div>
           <div>
             <label className={label} htmlFor="gstin">
-              GSTIN <span className="font-normal text-ink-dim">â€” optional</span>
+              GSTIN <span className="font-normal text-ink-dim">— optional</span>
             </label>
             <input id="gstin" className="input font-mono uppercase"
               value={values.gstin}
@@ -360,7 +360,7 @@ export function SignupForm() {
           </button>
         ) : (
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Sendingâ€¦" : "Submit registration"}
+            {submitting ? "Sending…" : "Submit registration"}
           </button>
         )}
       </div>

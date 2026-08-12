@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 /**
  * Admin gate for the activation screens.
@@ -11,12 +11,18 @@ import { timingSafeEqual } from "node:crypto";
 
 const HEADER = "x-admin-token";
 
+/**
+ * Constant-time comparison via fixed-width SHA-256 digests.
+ *
+ * Comparing the raw strings would mean handing timingSafeEqual two buffers of
+ * differing length, which throws. Hashing first makes both operands exactly 32
+ * bytes, so the comparison is always well-formed and still leaks no timing
+ * information about how much of the token matched.
+ */
 function constantTimeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "utf8");
-  const bufB = Buffer.from(b, "utf8");
-  // timingSafeEqual throws on length mismatch, which would itself leak length.
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const digestA = createHash("sha256").update(a, "utf8").digest();
+  const digestB = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(digestA, digestB);
 }
 
 /** Returns null when authorised, or a reason to refuse. */

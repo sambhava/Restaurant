@@ -6,6 +6,22 @@ import { sendSignupAcknowledgement, sendOwnerNotification } from "@/lib/email";
 
 export const runtime = "nodejs";
 
+// In-memory token bucket rate limiting for /api/signup (per IP)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const MAX_REQUESTS_PER_WINDOW = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  if (!record || now > record.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return false;
+  }
+  record.count += 1;
+  return record.count > MAX_REQUESTS_PER_WINDOW;
+}
+
 /**
  * POST /api/signup — record a registration as `pending`.
  *
@@ -14,6 +30,22 @@ export const runtime = "nodejs";
  * /admin/activations.
  */
 export async function POST(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1";
+  if (isRateLimited(clientIp)) {
+    return NextResponse.json(
+      { error: "Too many signup requests. Please try again in a few minutes." },
+      { status: 429 },
+    );
+  }
+
+  const contentType = request.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return NextResponse.json(
+      { error: "Invalid content type. Expected application/json." },
+      { status: 400 },
+    );
+  }
+
   let payload: unknown;
   try {
     payload = await request.json();

@@ -1,4 +1,3 @@
-import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { randomBytes, randomInt } from "node:crypto";
 import { adminDb } from "./firebase-admin";
@@ -11,6 +10,12 @@ import { sendWelcomeEmail } from "./email";
  * /admin/activations after confirming payment; later a Razorpay webhook can
  * call the same function with no other change. Keep it free of anything
  * request-specific.
+ *
+ * NOTE: `getAuth` from `firebase-admin/auth` is imported dynamically inside
+ * `activateSignup()` rather than at the top of this file. `jwks-rsa`, a
+ * transitive dependency of that subpath, calls `require()` on `jose`, which is
+ * ESM-only — a static import crashes the whole module at load time in Vercel's
+ * Node.js runtime, which surfaces as a zero-length 500 with no logs.
  */
 
 /** Tenant ids are random, not sequential — nobody should be able to guess the
@@ -36,6 +41,7 @@ export type ActivationResult = {
 
 export async function activateSignup(signupId: string): Promise<ActivationResult> {
   const db = adminDb();
+  const { getAuth } = await import("firebase-admin/auth");
   const auth = getAuth();
 
   const ref = db.collection("signups").doc(signupId);

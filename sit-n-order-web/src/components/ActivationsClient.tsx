@@ -199,7 +199,7 @@ export function ActivationsClient() {
       ) : (
         <ul className="mt-6 list-none space-y-4 p-0">
           {rows.map((s) => (
-            <li key={s.id} className="rounded-2xl border border-rule p-6">
+            <li key={s.id} className="rounded-2xl border border-rule p-4 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="t-card">{s.businessName}</h2>
@@ -255,7 +255,7 @@ export function ActivationsClient() {
                 <div className="mt-6 flex flex-wrap gap-3 border-t border-rule pt-5">
                   <button
                     type="button"
-                    className="btn btn-primary !py-2.5 text-sm"
+                    className="btn btn-primary w-full sm:w-auto !py-2.5 text-sm"
                     disabled={busyId === s.id}
                     onClick={() => setConfirming(s)}
                   >
@@ -263,7 +263,7 @@ export function ActivationsClient() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary !py-2.5 text-sm"
+                    className="btn btn-secondary w-full sm:w-auto !py-2.5 text-sm"
                     disabled={busyId === s.id}
                     onClick={() => act(s, "reject")}
                   >
@@ -289,7 +289,7 @@ export function ActivationsClient() {
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-ink-soft">
               This creates their workspace and emails{" "}
-              <span className="font-mono">{confirming.email}</span> a temporary
+              <span className="font-mono break-all">{confirming.email}</span> a temporary
               password. Only do this once the payment is actually in your
               account — it can&rsquo;t be undone from here.
             </p>
@@ -318,9 +318,9 @@ export function ActivationsClient() {
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap sm:flex-nowrap gap-1 sm:gap-2">
       <dt className="shrink-0 text-ink-dim">{label}:</dt>
-      <dd className={mono ? "font-mono text-[0.8125rem]" : ""}>{value}</dd>
+      <dd className={`break-all ${mono ? "font-mono text-[0.8125rem]" : ""}`}>{value}</dd>
     </div>
   );
 }

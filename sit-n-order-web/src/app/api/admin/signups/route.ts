@@ -26,12 +26,15 @@ type SignupRow = {
 
 /** GET — list signups for the activation queue. */
 export async function GET(request: Request) {
-  const refusal = checkAdminToken(request);
-  if (refusal) return NextResponse.json({ error: refusal }, { status: 401 });
-
-  const status = new URL(request.url).searchParams.get("status") ?? "pending";
-
+  // The whole handler is wrapped: a throw before the inner try (in the token
+  // check, or while resolving imports) otherwise surfaces as a zero-length 500
+  // with no body, which is very hard to diagnose from outside.
   try {
+    const refusal = checkAdminToken(request);
+    if (refusal) return NextResponse.json({ error: refusal }, { status: 401 });
+
+    const status = new URL(request.url).searchParams.get("status") ?? "pending";
+
     const snap = await adminDb()
       .collection("signups")
       .where("status", "==", status)
