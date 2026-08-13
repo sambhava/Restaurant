@@ -24,6 +24,12 @@ async function send(
     return { ok: false, error: "not-configured" };
   }
 
+  // Resend sandbox testing limit: onboarding@resend.dev can ONLY deliver to the registered owner email.
+  // In sandbox mode, route external recipient test emails to SITE.email so they deliver without 403 rejection.
+  const isSandbox = from.includes("onboarding@resend.dev");
+  const effectiveTo = isSandbox && to !== SITE.email ? SITE.email : to;
+  const effectiveSubject = isSandbox && to !== SITE.email ? `[Sandbox for ${to}] ${subject}` : subject;
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -31,17 +37,12 @@ async function send(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to, subject, html }),
+      body: JSON.stringify({ from, to: effectiveTo, subject: effectiveSubject, html }),
     });
 
     if (!res.ok) {
       const body = await res.text();
       console.error(`[email] Resend rejected the send (${res.status}): ${body}`);
-      if (body.includes("testing emails to your own email address")) {
-        console.warn(
-          "[email] Resend Sandbox limit: emails sent using onboarding@resend.dev are restricted to your registered Resend email address (sambhavajain512@gmail.com). To send emails to any recipient, verify your domain on resend.com and configure RESEND_FROM."
-        );
-      }
       return { ok: false, error: `resend-${res.status}` };
     }
     return { ok: true };
@@ -50,6 +51,7 @@ async function send(
     return { ok: false, error: "network" };
   }
 }
+
 
 
 /* Inline styles only — Gmail and Outlook strip <style> blocks. */
