@@ -1,17 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signupSchema, INDIAN_STATES } from "@/lib/signup-schema";
 
-/**
- * The shape the form itself holds.
- *
- * Deliberately not z.input<typeof signupSchema>: z.coerce.number() types its
- * input as `unknown`, which is right for the API boundary but useless for a
- * controlled input. The schema still validates every value before submit.
- */
 type SignupInput = {
   businessName: string;
   ownerName: string;
@@ -31,13 +24,12 @@ type SignupInput = {
   consentWhatsapp: boolean;
 };
 
-/* Four steps, because consent deserves its own screen rather than a checkbox
-   buried under a submit button. */
 const STEPS = [
   { n: 1, label: "Restaurant" },
   { n: 2, label: "Contact" },
   { n: 3, label: "Compliance" },
   { n: 4, label: "Consent" },
+  { n: 5, label: "Verify OTP" },
 ] as const;
 
 const FIELDS_BY_STEP: Record<number, (keyof SignupInput)[]> = {
@@ -45,6 +37,7 @@ const FIELDS_BY_STEP: Record<number, (keyof SignupInput)[]> = {
   2: ["email", "phone", "preferredLanguage"],
   3: ["fssaiLicense", "gstin"],
   4: ["consentTerms", "consentDataProcessing", "consentPayment"],
+  5: [],
 };
 
 const EMPTY: SignupInput = {
@@ -67,15 +60,40 @@ export function SignupForm() {
   const [values, setValues] = useState<SignupInput>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
+  // OTP state
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [sentOtpCode, setSentOtpCode] = useState("");
+  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  const otpRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  // Resend countdown timer
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
 
   function set<K extends keyof SignupInput>(key: K, value: SignupInput[K]) {
     setValues((v) => ({ ...v, [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
   }
 
-  /** Validate only the current step's fields, so step 1 isn't blocked by step 4. */
   function validateStep(n: number): boolean {
+    if (n === 5) return true;
     const result = signupSchema.safeParse(values);
     if (result.success) return true;
 
@@ -89,24 +107,116 @@ export function SignupForm() {
     return Object.keys(mine).length === 0;
   }
 
-  function next() {
+  async function triggerOtpSend() {
+    setSendingOtp(true);
+    setFormError(null);
+    setNotice(null);
+
+    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentOtpCode(generatedCode);
+    setOtpExpiry(Date.now() + 10 * 60 * 1000);
+
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email.trim().toLowerCase(),
+          code: generatedCode,
+        }),
+      });
+
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFormError(body.error ?? "Could not send verification code. Please check your email.");
+        setSendingOtp(false);
+        return false;
+      }
+
+      setNotice(
+        body.simulated
+          ? `[Dev Mode] OTP logged to console: ${generatedCode}`
+          : `Verification code sent to ${values.email}. Check your inbox or spam folder.`
+      );
+      setResendTimer(60);
+      setStep(5);
+      setTimeout(() => otpRefs[0].current?.focus(), 150);
+      return true;
+    } catch {
+      setFormError("We couldn't reach the server. Check your connection.");
+      return false;
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function next() {
     if (validateStep(step)) {
-      setStep((s) => Math.min(4, s + 1));
-      setFormError(null);
+      if (step === 4) {
+        // From Consent step, send OTP and advance to Step 5
+        await triggerOtpSend();
+      } else {
+        setStep((s) => Math.min(5, s + 1));
+        setFormError(null);
+      }
+    }
+  }
+
+  function handleOtpChange(index: number, val: string) {
+    const char = val.slice(-1);
+    if (char && !/^\d$/.test(char)) return;
+
+    const updated = [...otpDigits];
+    updated[index] = char;
+    setOtpDigits(updated);
+
+    if (char && index < 4) {
+      otpRefs[index + 1].current?.focus();
+    }
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      otpRefs[index - 1].current?.focus();
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").trim();
+    if (/^\d{6}$/.test(pasted)) {
+      const chars = pasted.split("");
+      setOtpDigits(chars);
+      otpRefs[5].current?.focus();
     }
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateStep(4)) return;
+    setFormError(null);
+
+    const enteredCode = otpDigits.join("");
+    if (enteredCode.length < 6) {
+      setFormError("Please enter the 6-digit verification code sent to your email.");
+      return;
+    }
+
+    if (otpExpiry && Date.now() > otpExpiry) {
+      setFormError("Verification code has expired. Please click Resend Code.");
+      return;
+    }
+
+    if (enteredCode !== sentOtpCode) {
+      setFormError("Incorrect verification code. Please check the code in your email and try again.");
+      return;
+    }
 
     setSubmitting(true);
-    setFormError(null);
     try {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, emailVerified: true }),
       });
 
       if (res.ok) {
@@ -144,7 +254,7 @@ export function SignupForm() {
 
   return (
     <form onSubmit={submit} noValidate>
-      {/* Progress */}
+      {/* Progress Bar */}
       <ol className="mb-9 flex list-none gap-1.5 p-0">
         {STEPS.map((s) => (
           <li key={s.n} className="flex-1">
@@ -341,6 +451,61 @@ export function SignupForm() {
         </fieldset>
       )}
 
+      {/* Step 5: OTP Email Verification */}
+      {step === 5 && (
+        <fieldset className="space-y-5 border-0 p-0 text-center">
+          <legend className="sr-only">Verify email OTP</legend>
+          <div className="mx-auto max-w-sm rounded-2xl border border-rule bg-paper-2 p-6">
+            <h3 className="t-card mb-2 text-ink">Verify your email address</h3>
+            <p className="mb-6 text-sm leading-relaxed text-ink-soft">
+              We sent a 6-digit verification code to{" "}
+              <strong className="text-ink font-semibold">{values.email}</strong>.
+            </p>
+
+            <div className="mb-6 flex justify-center gap-2" onPaste={handleOtpPaste}>
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={otpRefs[idx]}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  className="h-12 w-11 rounded-lg border border-rule bg-paper text-center font-mono text-xl font-bold text-ink shadow-xs focus:border-amber focus:outline-none"
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-ink-dim">
+              <button
+                type="button"
+                className="text-ink-soft hover:underline"
+                onClick={() => setStep(2)}
+              >
+                ← Change email
+              </button>
+
+              <button
+                type="button"
+                disabled={resendTimer > 0 || sendingOtp}
+                onClick={triggerOtpSend}
+                className="font-semibold text-amber-deep disabled:text-ink-dim"
+              >
+                {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend code"}
+              </button>
+            </div>
+          </div>
+        </fieldset>
+      )}
+
+      {notice && (
+        <p role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {notice}
+        </p>
+      )}
+
       {formError && (
         <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {formError}
@@ -348,7 +513,7 @@ export function SignupForm() {
       )}
 
       <div className="mt-9 flex items-center gap-3">
-        {step > 1 && (
+        {step > 1 && step < 5 && (
           <button type="button" className="btn btn-secondary"
             onClick={() => { setStep((s) => s - 1); setFormError(null); }}>
             Back
@@ -358,9 +523,13 @@ export function SignupForm() {
           <button type="button" className="btn btn-primary" onClick={next}>
             Continue
           </button>
+        ) : step === 4 ? (
+          <button type="button" className="btn btn-primary" onClick={next} disabled={sendingOtp}>
+            {sendingOtp ? "Sending OTP…" : "Verify Email & Continue →"}
+          </button>
         ) : (
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? "Sending…" : "Submit registration"}
+          <button type="submit" className="btn btn-primary w-full justify-center !py-3 text-base" disabled={submitting}>
+            {submitting ? "Verifying & Registering…" : "Verify Code & Complete Registration ✓"}
           </button>
         )}
       </div>
