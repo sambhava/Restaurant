@@ -2072,3 +2072,49 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE SAFE AREA INSETS & TOUCH OPTIMIZATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Mobile viewport bottom padding for iOS/Android home indicators */
+body {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.cart-float-bar,
+.bottom-nav {
+  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+}
+
+@media (max-width: 639px) {
+  /* Prevent iOS auto-zoom on form elements */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Responsive Modal Scaling */
+  .customise-modal,
+  .modal-box {
+    width: 94% !important;
+    max-height: 90vh !important;
+    border-radius: var(--radius-lg) !important;
+    overflow-y: auto !important;
+  }
+
+  /* Category tabs horizontal scrolling refinement */
+  .category-tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .category-tabs-container::-webkit-scrollbar {
+    display: none;
+  }
+}

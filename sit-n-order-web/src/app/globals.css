@@ -427,3 +427,38 @@ mark.todo {
   font-size: 0.9375rem;
   color: var(--color-ink-soft);
 }
+
+/* ── Mobile & Touch Optimizations ────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  /* Prevent iOS Safari auto-zoom on focus by enforcing 16px font-size */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  select,
+  textarea,
+  .input {
+    font-size: 16px !important;
+  }
+
+  /* Ensure minimum tap target height for interactive controls */
+  .btn,
+  button:not(.inline-icon-btn),
+  .consent {
+    min-height: 44px;
+  }
+}
+
+.responsive-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-block: 1rem;
+}
+
+.responsive-table-wrapper table {
+  min-width: 600px;
+}
+
