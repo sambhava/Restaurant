@@ -17,10 +17,10 @@ async function send(
   html: string,
 ): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
+  const from = process.env.RESEND_FROM || "Sit-N-Order <onboarding@resend.dev>";
 
-  if (!apiKey || !from) {
-    console.warn(`[email] Not configured — would have sent "${subject}" to ${to}`);
+  if (!apiKey) {
+    console.warn(`[email] RESEND_API_KEY not configured — skipped sending "${subject}" to ${to}`);
     return { ok: false, error: "not-configured" };
   }
 
@@ -36,7 +36,12 @@ async function send(
 
     if (!res.ok) {
       const body = await res.text();
-      console.error(`[email] Resend rejected the send: ${res.status} ${body}`);
+      console.error(`[email] Resend rejected the send (${res.status}): ${body}`);
+      if (body.includes("testing emails to your own email address")) {
+        console.warn(
+          "[email] Resend Sandbox limit: emails sent using onboarding@resend.dev are restricted to your registered Resend email address (sambhavajain512@gmail.com). To send emails to any recipient, verify your domain on resend.com and configure RESEND_FROM."
+        );
+      }
       return { ok: false, error: `resend-${res.status}` };
     }
     return { ok: true };
@@ -45,6 +50,7 @@ async function send(
     return { ok: false, error: "network" };
   }
 }
+
 
 /* Inline styles only — Gmail and Outlook strip <style> blocks. */
 const wrap = (heading: string, body: string) => `
