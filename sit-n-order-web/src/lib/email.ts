@@ -1,4 +1,4 @@
-import { SITE, formatINR } from "./site.ts";
+import { SITE, formatINR } from "./site";
 
 /**
  * Transactional email via Resend.
