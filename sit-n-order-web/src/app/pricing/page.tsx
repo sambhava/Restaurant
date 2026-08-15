@@ -15,10 +15,8 @@ const INCLUDED = [
   ["QR ordering", "unlimited tables"],
   ["Menu management", "variants + add-ons"],
   ["Live orders", "real time"],
-  ["Kitchen display", "included"],
   ["Table billing", "GST invoices"],
   ["Analytics", "full history"],
-  ["Staff logins", "unlimited"],
   ["Support", "email + WhatsApp"],
   ["Updates", "included"],
 ];
@@ -149,32 +147,37 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <section className="shell-narrow py-20">
-        <p className="eyebrow">Questions</p>
-        <h2 className="t-section mt-4 text-[2rem]">About paying</h2>
+      <section className="shell py-24 border-t border-rule/60">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr] lg:gap-16 items-start">
+          <div className="lg:sticky lg:top-28">
+            <p className="eyebrow">Questions</p>
+            <h2 className="t-section mt-4 text-[2rem]">About paying.</h2>
+            <p className="mt-4 text-sm text-ink-soft max-w-[36ch] leading-relaxed">
+              Transparent pricing with no hidden charges, per-table fees, or setup costs.
+            </p>
+            <p className="mt-8 text-xs text-ink-dim leading-relaxed">
+              Read our full{" "}
+              <Link href="/legal/refund" className="text-amber-deep hover:underline">
+                Refund &amp; Cancellation policy
+              </Link>{" "}
+              and{" "}
+              <Link href="/legal/terms" className="text-amber-deep hover:underline">
+                Terms of Service
+              </Link>.
+            </p>
+          </div>
 
-        <dl className="mt-8 divide-y divide-rule border-y border-rule">
-          {FAQS.map((f) => (
-            <div key={f.q} className="py-6">
-              <dt className="font-display text-base font-bold tracking-[-0.02em]">
-                {f.q}
-              </dt>
-              <dd className="mt-2 text-[0.9375rem] text-ink-soft">{f.a}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <p className="mt-8 text-sm text-ink-dim">
-          The{" "}
-          <Link href="/legal/refund" className="text-amber-deep">
-            Refund &amp; Cancellation policy
-          </Link>{" "}
-          and{" "}
-          <Link href="/legal/terms" className="text-amber-deep">
-            Terms of Service
-          </Link>{" "}
-          set out the rest.
-        </p>
+          <dl className="divide-y divide-rule border-y border-rule">
+            {FAQS.map((f) => (
+              <div key={f.q} className="py-6">
+                <dt className="font-display text-base font-bold tracking-[-0.02em] text-ink">
+                  {f.q}
+                </dt>
+                <dd className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-soft">{f.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </section>
     </>
   );

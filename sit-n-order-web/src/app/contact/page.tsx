@@ -116,16 +116,16 @@ export default function ContactPage() {
           </dl>
         </div>
 
-        <div className="mt-10 rounded-2xl bg-ink px-8 py-12 text-center text-paper">
-          <h2 className="t-section text-[1.75rem] text-paper">
+        <div className="mt-12 rounded-2xl bg-ink px-8 py-16 text-center text-paper shadow-lg flex flex-col items-center justify-center">
+          <h2 className="t-section text-paper text-[clamp(1.75rem,3.5vw,2.5rem)]">
             Ready to set it up?
           </h2>
-          <p className="mx-auto mt-3 max-w-[40ch] text-sm text-slate-300">
-            The signup form takes a couple of minutes.
+          <p className="mt-4 max-w-[46ch] text-[0.9375rem] text-slate-300 leading-relaxed text-center mx-auto">
+            The signup form takes a couple of minutes. We&rsquo;ll review and activate your account the same working day.
           </p>
           <Link
             href="/signup"
-            className="btn mt-7 bg-amber font-semibold text-ink hover:brightness-95"
+            className="btn mt-8 bg-amber font-semibold text-ink hover:brightness-95 !px-8 !py-3.5 shadow-md"
           >
             Get started
           </Link>

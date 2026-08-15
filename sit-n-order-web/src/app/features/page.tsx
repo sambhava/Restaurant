@@ -108,15 +108,6 @@ const SECTIONS = [
   },
 ];
 
-/* Stating the limits plainly is worth more than one more feature card. An owner
-   who finds this out after paying asks for a refund. */
-const NOT_INCLUDED = [
-  "Online payment collection — diners pay you at the counter as they do now",
-  "Inventory or stock tracking",
-  "A combined view across multiple outlets — each outlet is its own account",
-  "Integrations with Swiggy, Zomato or third-party POS systems",
-];
-
 export default function FeaturesPage() {
   return (
     <>
@@ -201,39 +192,27 @@ export default function FeaturesPage() {
         ))}
       </div>
 
-      <section className="border-t border-rule bg-paper-2 py-20">
-        <div className="shell-narrow">
-          <p className="eyebrow">Worth knowing</p>
-          <h2 className="t-section mt-4 text-[2rem]">Not in the box</h2>
-          <p className="mt-4 text-[0.9375rem] text-ink-soft">
-            Better you know now than after you&rsquo;ve paid.
+      {/* ── Close CTA ────────────────────────────────────────────────────── */}
+      <section className="shell pb-24">
+        <div className="rounded-2xl bg-ink px-8 py-16 text-center text-paper shadow-lg flex flex-col items-center justify-center">
+          <h2 className="t-section text-paper">Ready to get started?</h2>
+          <p className="mt-4 max-w-[46ch] text-[0.9375rem] text-slate-300 leading-relaxed text-center mx-auto">
+            Everything your floor and billing need, in one flat plan at {formatINR(SITE.plan.priceMonthly)} {SITE.plan.unit}.
           </p>
-          <ul className="mt-6 list-none space-y-2.5 p-0">
-            {NOT_INCLUDED.map((n) => (
-              <li
-                key={n}
-                className="flex gap-3 text-[0.9375rem] text-ink-soft"
-              >
-                <span aria-hidden="true" className="mt-[1px] text-ink-dim">
-                  —
-                </span>
-                {n}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Link href="/pricing" className="btn btn-primary">
-              See pricing
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/signup"
+              className="btn bg-amber font-semibold text-ink hover:brightness-95 !px-8 !py-3.5 shadow-md"
+            >
+              Get started
             </Link>
-            <Link href="/contact" className="btn btn-secondary">
-              Ask us something
+            <Link
+              href="/pricing"
+              className="btn border-slate-700 bg-transparent text-paper hover:border-slate-500 !px-6 !py-3.5"
+            >
+              View pricing details
             </Link>
           </div>
-
-          <p className="mt-6 font-mono text-xs text-ink-dim">
-            {formatINR(SITE.plan.priceMonthly)} {SITE.plan.unit}
-          </p>
         </div>
       </section>
     </>
