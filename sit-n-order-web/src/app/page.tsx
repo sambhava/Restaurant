@@ -181,33 +181,45 @@ export default function HomePage() {
       </section>
 
       {/* ── FAQ ──────────────────────────────────────────────────────────── */}
-      <section className="shell-narrow py-24">
-        <p className="eyebrow">Questions</p>
-        <h2 className="t-section mt-4">Before you ask</h2>
-
-        <dl className="mt-10 divide-y divide-rule border-y border-rule">
-          {FAQS.map((f) => (
-            <div key={f.q} className="py-6">
-              <dt className="font-display text-base font-bold tracking-[-0.02em]">
-                {f.q}
-              </dt>
-              <dd className="mt-2 text-[0.9375rem] text-ink-soft">{f.a}</dd>
+      <section className="shell py-24 border-t border-rule/60">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr] lg:gap-16 items-start">
+          <div className="lg:sticky lg:top-28">
+            <p className="eyebrow">Questions</p>
+            <h2 className="t-section mt-4">Before you ask.</h2>
+            <p className="mt-4 text-sm text-ink-soft max-w-[36ch] leading-relaxed">
+              Everything you need to know about getting started, hardware requirements, and how Sit-N-Order works at your tables.
+            </p>
+            <div className="mt-8">
+              <Link href="/contact" className="text-xs font-semibold text-amber-deep hover:underline">
+                Have a different question? Talk to us →
+              </Link>
             </div>
-          ))}
-        </dl>
+          </div>
+
+          <dl className="divide-y divide-rule border-y border-rule">
+            {FAQS.map((f) => (
+              <div key={f.q} className="py-6">
+                <dt className="font-display text-base font-bold tracking-[-0.02em] text-ink">
+                  {f.q}
+                </dt>
+                <dd className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-soft">{f.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </section>
 
-      {/* ── Close ────────────────────────────────────────────────────────── */}
+      {/* ── Close CTA ────────────────────────────────────────────────────── */}
       <section className="shell pb-24">
-        <div className="rounded-2xl bg-ink px-8 py-16 text-center text-paper">
+        <div className="rounded-2xl bg-ink px-8 py-16 text-center text-paper shadow-lg flex flex-col items-center justify-center">
           <h2 className="t-section text-paper">Put a QR on every table.</h2>
-          <p className="mx-auto mt-4 max-w-[42ch] text-[0.9375rem] text-slate-300">
+          <p className="mt-4 max-w-[46ch] text-[0.9375rem] text-slate-300 leading-relaxed text-center">
             Tell us about your restaurant and we&rsquo;ll set you up. Most
             accounts are live the same working day.
           </p>
           <Link
             href="/signup"
-            className="btn mt-8 bg-amber font-semibold text-ink hover:brightness-95"
+            className="btn mt-8 bg-amber font-semibold text-ink hover:brightness-95 !px-8 !py-3.5 shadow-md"
           >
             Get started
           </Link>
