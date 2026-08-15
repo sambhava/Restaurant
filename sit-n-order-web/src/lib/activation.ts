@@ -87,7 +87,9 @@ export async function activateSignup(signupId: string): Promise<ActivationResult
     gstin: signup.gstin ?? null,
     tableCount: signup.tableCount ?? 10,
     isOpen: true,
+    subscriptionStatus: "active",
     createdAt: FieldValue.serverTimestamp(),
+    subscriptionStartedAt: FieldValue.serverTimestamp(),
   });
 
   // The dashboard reads restaurantId and status from here on every load. This
@@ -98,12 +100,15 @@ export async function activateSignup(signupId: string): Promise<ActivationResult
     restaurantName: signup.businessName,
     role: "owner",
     status: "active",
+    subscriptionStatus: "active",
     createdAt: FieldValue.serverTimestamp(),
   });
 
   batch.update(ref, {
     status: "activated",
+    subscriptionStatus: "active",
     activatedAt: FieldValue.serverTimestamp(),
+    subscriptionStartedAt: FieldValue.serverTimestamp(),
     restaurantId,
     uid,
   });
@@ -116,6 +121,138 @@ export async function activateSignup(signupId: string): Promise<ActivationResult
   return { restaurantId, uid, email, emailSent: sent.ok };
 }
 
+export async function pauseSubscription(signupId: string, reason?: string) {
+  const db = adminDb();
+  const ref = db.collection("signups").doc(signupId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Signup record not found.");
+
+  const signup = snap.data()!;
+  const { restaurantId, uid } = signup;
+
+  const batch = db.batch();
+
+  batch.update(ref, {
+    subscriptionStatus: "paused",
+    pausedAt: FieldValue.serverTimestamp(),
+    pauseReason: reason ?? "Admin paused",
+  });
+
+  if (restaurantId) {
+    batch.update(db.collection("restaurants").doc(restaurantId), {
+      isOpen: false,
+      subscriptionStatus: "paused",
+      pausedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  if (uid) {
+    batch.update(db.collection("users").doc(uid), {
+      status: "paused",
+      subscriptionStatus: "paused",
+      pausedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+}
+
+export async function resumeSubscription(signupId: string) {
+  const db = adminDb();
+  const ref = db.collection("signups").doc(signupId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Signup record not found.");
+
+  const signup = snap.data()!;
+  const { restaurantId, uid } = signup;
+
+  const batch = db.batch();
+
+  batch.update(ref, {
+    subscriptionStatus: "active",
+    resumedAt: FieldValue.serverTimestamp(),
+    pauseReason: null,
+  });
+
+  if (restaurantId) {
+    batch.update(db.collection("restaurants").doc(restaurantId), {
+      isOpen: true,
+      subscriptionStatus: "active",
+      resumedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  if (uid) {
+    batch.update(db.collection("users").doc(uid), {
+      status: "active",
+      subscriptionStatus: "active",
+      resumedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+}
+
+export async function endSubscription(signupId: string, reason?: string) {
+  const db = adminDb();
+  const ref = db.collection("signups").doc(signupId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Signup record not found.");
+
+  const signup = snap.data()!;
+  const { restaurantId, uid } = signup;
+
+  const batch = db.batch();
+
+  batch.update(ref, {
+    subscriptionStatus: "cancelled",
+    cancelledAt: FieldValue.serverTimestamp(),
+    cancellationReason: reason ?? "Subscription terminated by admin",
+  });
+
+  if (restaurantId) {
+    batch.update(db.collection("restaurants").doc(restaurantId), {
+      isOpen: false,
+      subscriptionStatus: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  if (uid) {
+    batch.update(db.collection("users").doc(uid), {
+      status: "cancelled",
+      subscriptionStatus: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+}
+
+export async function resendCredentials(signupId: string): Promise<{ email: string; emailSent: boolean }> {
+  const db = adminDb();
+  const { getAuth } = await import("firebase-admin/auth");
+  const auth = getAuth();
+
+  const ref = db.collection("signups").doc(signupId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Signup record not found.");
+
+  const signup = snap.data()!;
+  const email: string = signup.email;
+  const tempPassword = generateTempPassword();
+
+  if (signup.uid) {
+    await auth.updateUser(signup.uid, { password: tempPassword });
+  } else {
+    const user = await auth.getUserByEmail(email);
+    await auth.updateUser(user.uid, { password: tempPassword });
+  }
+
+  const sent = await sendWelcomeEmail(email, signup.businessName, tempPassword);
+  return { email, emailSent: sent.ok };
+}
+
 export async function rejectSignup(signupId: string, reason?: string) {
   await adminDb().collection("signups").doc(signupId).update({
     status: "rejected",
@@ -123,3 +260,4 @@ export async function rejectSignup(signupId: string, reason?: string) {
     rejectionReason: reason ?? null,
   });
 }
+

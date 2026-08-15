@@ -210,21 +210,39 @@ export default function LoginPage() {
         );
     };
 
-    // Unprovisioned screen
+    // Unprovisioned or Inactive/Paused screen
     if (user && (accountStatus === 'unprovisioned' || (accountStatus && accountStatus !== 'active'))) {
+        const isPaused = accountStatus === 'paused';
+        const isCancelled = accountStatus === 'cancelled';
+
         return (
             <div className="login-page">
                 <div className="login-card">
                     <div className="login-header">
-                        <h1>Almost there</h1>
-                        <p>Your account isn't active yet</p>
+                        <h1>
+                            {isPaused
+                                ? '⏸️ Subscription Paused'
+                                : isCancelled
+                                ? '⛔ Subscription Ended'
+                                : 'Almost there'}
+                        </h1>
+                        <p>
+                            {isPaused
+                                ? 'Your restaurant subscription is currently on hold'
+                                : isCancelled
+                                ? 'This workspace has been closed'
+                                : "Your account isn't active yet"}
+                        </p>
                     </div>
                     <p style={{ fontSize: '14px', color: '#475569', textAlign: 'center', lineHeight: 1.7 }}>
-                        We've received your registration. Once your payment is confirmed we'll activate your
-                        workspace and email you — usually the same working day.
+                        {isPaused
+                            ? 'Your subscription was paused by the platform administrator. Access to the dashboard and live QR ordering are temporarily disabled. Please contact support to resume your plan.'
+                            : isCancelled
+                            ? 'Your subscription for this restaurant has expired or was terminated. If you would like to reactivate your access, please get in touch with our team.'
+                            : "We've received your registration. Once your payment is confirmed we'll activate your workspace and email you — usually the same working day."}
                     </p>
                     <p style={{ fontSize: '13px', color: '#64748B', textAlign: 'center', marginTop: '14px' }}>
-                        Need help? Get in touch and we'll sort it out.
+                        Need help? Email <strong>sambhavajain512@gmail.com</strong> or message on WhatsApp.
                     </p>
                     <button
                         type="button"
