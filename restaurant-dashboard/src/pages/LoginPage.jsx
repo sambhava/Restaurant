@@ -326,44 +326,53 @@ export default function LoginPage() {
                     </p>
                 </div>
 
-                {/* Step Progress Badge for 2FA */}
+                {/* Minimal Step Indicator (1 and 2) */}
                 {mode !== 'forgot' && (
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        marginBottom: '22px',
+                        marginBottom: '24px',
                     }}>
                         <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 12px',
-                            borderRadius: '100px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            background: mode === 'credentials' ? '#FEF3C7' : '#DCFCE7',
-                            color: mode === 'credentials' ? '#B45309' : '#15803D',
+                            justifyContent: 'center',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            background: mode === 'twofactor' ? '#10B981' : '#F59E0B',
+                            color: '#FFFFFF',
+                            boxShadow: mode === 'credentials' ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none',
+                            transition: 'all 0.25s ease',
                         }}>
-                            <span>{mode === 'credentials' ? 'Step 1 of 2' : '✓ Step 1 Complete'}</span>
-                            <span>•</span>
-                            <span>{mode === 'credentials' ? 'Credentials' : 'Password Verified'}</span>
+                            {mode === 'twofactor' ? '✓' : '1'}
                         </div>
-                        <span style={{ color: '#94A3B8', fontSize: '12px' }}>→</span>
                         <div style={{
+                            width: '40px',
+                            height: '2px',
+                            background: mode === 'twofactor' ? '#10B981' : '#E2E8F0',
+                            transition: 'all 0.25s ease',
+                        }} />
+                        <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 12px',
-                            borderRadius: '100px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            background: mode === 'twofactor' ? '#FEF3C7' : '#F1F5F9',
-                            color: mode === 'twofactor' ? '#B45309' : '#64748B',
+                            justifyContent: 'center',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            background: mode === 'twofactor' ? '#F59E0B' : '#F1F5F9',
+                            color: mode === 'twofactor' ? '#FFFFFF' : '#94A3B8',
+                            border: mode === 'twofactor' ? 'none' : '1.5px solid #E2E8F0',
+                            boxShadow: mode === 'twofactor' ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none',
+                            transition: 'all 0.25s ease',
                         }}>
-                            <ShieldCheckIcon />
-                            <span>Step 2: 2FA</span>
+                            2
                         </div>
                     </div>
                 )}
@@ -460,20 +469,6 @@ export default function LoginPage() {
                             <div className="login-error">{customError || formatAuthError(error)}</div>
                         )}
                         {notice && <div className="login-success">{notice}</div>}
-
-                        <div style={{
-                            background: '#F8FAFC',
-                            border: '1px solid #E2E8F0',
-                            borderRadius: '10px',
-                            padding: '12px 16px',
-                            textAlign: 'center',
-                            fontSize: '13px',
-                            color: '#475569',
-                            lineHeight: 1.5,
-                        }}>
-                            <span>Enter the 6-digit security code sent to </span>
-                            <strong style={{ color: '#0F172A', wordBreak: 'break-all' }}>{email}</strong>
-                        </div>
 
                         <div className="form-group" style={{ marginTop: '4px' }}>
                             <label style={{ textAlign: 'center', marginBottom: '8px', display: 'block', fontSize: '13px', fontWeight: 600 }}>
