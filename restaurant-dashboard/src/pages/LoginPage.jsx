@@ -39,36 +39,70 @@ function EyeIcon({ open }) {
     );
 }
 
+function ShieldCheckIcon() {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="m9 12 2 2 4-4"></path>
+        </svg>
+    );
+}
+
 export default function LoginPage() {
-    // Mode: 'password' | 'otp' | 'forgot'
-    const [mode, setMode] = useState('password');
+    // Mode: 'credentials' | 'twofactor' | 'forgot'
+    const [mode, setMode] = useState('credentials');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     
-    // OTP State
-    const [otpStep, setOtpStep] = useState('request'); // 'request' | 'verify'
+    // 2FA OTP State
     const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
     const [sentOtpCode, setSentOtpCode] = useState('');
     const [otpExpiry, setOtpExpiry] = useState(null);
     const [resendTimer, setResendTimer] = useState(0);
     const [sendingOtp, setSendingOtp] = useState(false);
+    const [verifyingOtp, setVerifyingOtp] = useState(false);
 
     const [notice, setNotice] = useState('');
     const [customError, setCustomError] = useState('');
 
     const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
-    const { user, restaurantId, accountStatus, login, resetPassword, loading, error, clearError } =
-        useAuthStore();
+    const {
+        user,
+        restaurantId,
+        accountStatus,
+        twoFactorVerified,
+        login,
+        logout,
+        setTwoFactorVerified,
+        resetPassword,
+        loading,
+        error,
+        clearError,
+    } = useAuthStore();
     const navigate = useNavigate();
 
-    // Auto-redirect when authenticated and active
+    // Auto-redirect when authenticated, active, and 2FA verified
     useEffect(() => {
-        if (user && restaurantId && accountStatus === 'active') {
+        if (user && restaurantId && accountStatus === 'active' && twoFactorVerified) {
             navigate('/dashboard/orders', { replace: true });
         }
-    }, [user, restaurantId, accountStatus, navigate]);
+    }, [user, restaurantId, accountStatus, twoFactorVerified, navigate]);
+
+    // If already authenticated via Firebase but not 2FA verified in this session, transition to 2FA step
+    useEffect(() => {
+        if (user && restaurantId && accountStatus === 'active' && !twoFactorVerified && mode === 'credentials') {
+            if (user.email && !email) {
+                setEmail(user.email);
+            }
+            setMode('twofactor');
+            // If we don't have an active OTP code generated yet, trigger sending
+            if (!sentOtpCode && !sendingOtp) {
+                triggerSendOtp(user.email);
+            }
+        }
+    }, [user, restaurantId, accountStatus, twoFactorVerified, mode]);
 
     // Resend countdown timer
     useEffect(() => {
@@ -78,24 +112,9 @@ export default function LoginPage() {
         }
     }, [resendTimer]);
 
-    const handlePasswordLogin = async (e) => {
-        e.preventDefault();
-        clearError();
-        setCustomError('');
-        setNotice('');
-        try {
-            await login(email, password);
-        } catch {
-            // Surfaced via store's `error`.
-        }
-    };
-
-    const handleSendOtp = async (e) => {
-        if (e) e.preventDefault();
-        if (!email.trim()) {
-            setCustomError('Please enter your email address.');
-            return;
-        }
+    const triggerSendOtp = async (targetEmail) => {
+        const destEmail = (targetEmail || email).trim().toLowerCase();
+        if (!destEmail) return;
 
         clearError();
         setCustomError('');
@@ -110,7 +129,7 @@ export default function LoginPage() {
             const response = await fetch('/api/send-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim().toLowerCase(), code: generatedCode }),
+                body: JSON.stringify({ email: destEmail, code: generatedCode }),
             });
 
             const data = await response.json();
@@ -124,16 +143,37 @@ export default function LoginPage() {
             setNotice(
                 data.simulated
                     ? `[Dev Mode] Verification code logged to console: ${generatedCode}`
-                    : `Verification code sent to ${email}. Check your inbox and spam folder.`
+                    : `Security code sent to ${destEmail}. Check your inbox and spam folder.`
             );
-            setOtpStep('verify');
             setResendTimer(60);
             setTimeout(() => otpRefs[0].current?.focus(), 100);
         } catch (err) {
-            console.error('Error triggering OTP:', err);
-            setCustomError('Failed to reach OTP server. Check your internet connection.');
+            console.error('Error triggering 2FA OTP:', err);
+            setCustomError('Failed to reach verification server. Check your internet connection.');
         } finally {
             setSendingOtp(false);
+        }
+    };
+
+    // Step 1: Submit email & password -> Authenticate with Firebase -> Trigger 2FA OTP
+    const handleCredentialsSubmit = async (e) => {
+        e.preventDefault();
+        clearError();
+        setCustomError('');
+        setNotice('');
+
+        if (!email.trim() || !password) {
+            setCustomError('Please enter both email and password.');
+            return;
+        }
+
+        try {
+            await login(email, password);
+            // Firebase Auth successful! Now initiate Step 2 (2FA OTP)
+            setMode('twofactor');
+            await triggerSendOtp(email);
+        } catch {
+            // Surfaced via store's `error` state
         }
     };
 
@@ -166,6 +206,7 @@ export default function LoginPage() {
         }
     };
 
+    // Step 2: Verify OTP -> Grant 2FA Access -> Navigate to Dashboard
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
         clearError();
@@ -174,25 +215,39 @@ export default function LoginPage() {
 
         const enteredCode = otpDigits.join('');
         if (enteredCode.length < 6) {
-            setCustomError('Please enter the complete 6-digit verification code.');
+            setCustomError('Please enter the full 6-digit verification code.');
             return;
         }
 
-        if (Date.now() > otpExpiry) {
-            setCustomError('Verification code has expired. Click resend to get a new code.');
+        if (otpExpiry && Date.now() > otpExpiry) {
+            setCustomError('Verification code has expired. Click resend to receive a new code.');
             return;
         }
 
         if (enteredCode !== sentOtpCode) {
-            setCustomError('Incorrect verification code. Please check the code in your email.');
+            setCustomError('Incorrect verification code. Please check your email and try again.');
             return;
         }
 
-        // OTP match confirmed
-        setNotice('✓ Verification successful! Redirecting to your dashboard…');
+        // 2FA Verified!
+        setVerifyingOtp(true);
+        setNotice('✓ 2FA Verified successfully! Redirecting to dashboard…');
+        setTwoFactorVerified(true);
+
         setTimeout(() => {
             navigate('/dashboard/orders', { replace: true });
-        }, 1200);
+        }, 800);
+    };
+
+    const handleBackToCredentials = async () => {
+        clearError();
+        setCustomError('');
+        setNotice('');
+        setOtpDigits(['', '', '', '', '', '']);
+        setSentOtpCode('');
+        setOtpExpiry(null);
+        await logout();
+        setMode('credentials');
     };
 
     const handleForgot = async (e) => {
@@ -202,12 +257,12 @@ export default function LoginPage() {
         setNotice('');
         try {
             await resetPassword(email);
+            setNotice(
+                `If an account exists for ${email}, a password reset link is on its way. Check your inbox and spam folder.`
+            );
         } catch {
             // Surfaced via error state
         }
-        setNotice(
-            `If an account exists for ${email}, a password reset link is on its way. Check your inbox and spam folder.`
-        );
     };
 
     // Unprovisioned or Inactive/Paused screen
@@ -263,79 +318,59 @@ export default function LoginPage() {
                 <div className="login-header">
                     <h1>🍽️ Restaurant Dashboard</h1>
                     <p>
-                        {mode === 'password'
-                            ? 'Sign in with Password'
-                            : mode === 'otp'
-                            ? 'Sign in with Email OTP'
+                        {mode === 'credentials'
+                            ? 'Sign in with your email and password'
+                            : mode === 'twofactor'
+                            ? 'Two-Factor Authentication (2FA)'
                             : 'Reset your password'}
                     </p>
                 </div>
 
-                {/* Login Mode Toggle (Password vs OTP) */}
+                {/* Step Progress Badge for 2FA */}
                 {mode !== 'forgot' && (
                     <div style={{
                         display: 'flex',
-                        background: '#F1F5F9',
-                        padding: '4px',
-                        borderRadius: '10px',
-                        marginBottom: '24px',
-                        gap: '4px'
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        marginBottom: '22px',
                     }}>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setMode('password');
-                                clearError();
-                                setCustomError('');
-                                setNotice('');
-                            }}
-                            style={{
-                                flex: 1,
-                                padding: '8px 12px',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontSize: '13px',
-                                fontWeight: mode === 'password' ? '700' : '500',
-                                background: mode === 'password' ? '#FFFFFF' : 'transparent',
-                                color: mode === 'password' ? '#0F172A' : '#64748B',
-                                boxShadow: mode === 'password' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            🔑 Password
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setMode('otp');
-                                setOtpStep('request');
-                                clearError();
-                                setCustomError('');
-                                setNotice('');
-                            }}
-                            style={{
-                                flex: 1,
-                                padding: '8px 12px',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontSize: '13px',
-                                fontWeight: mode === 'otp' ? '700' : '500',
-                                background: mode === 'otp' ? '#FFFFFF' : 'transparent',
-                                color: mode === 'otp' ? '#0F172A' : '#64748B',
-                                boxShadow: mode === 'otp' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            ✉️ Email OTP
-                        </button>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 12px',
+                            borderRadius: '100px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            background: mode === 'credentials' ? '#FEF3C7' : '#DCFCE7',
+                            color: mode === 'credentials' ? '#B45309' : '#15803D',
+                        }}>
+                            <span>{mode === 'credentials' ? 'Step 1 of 2' : '✓ Step 1 Complete'}</span>
+                            <span>•</span>
+                            <span>{mode === 'credentials' ? 'Credentials' : 'Password Verified'}</span>
+                        </div>
+                        <span style={{ color: '#94A3B8', fontSize: '12px' }}>→</span>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 12px',
+                            borderRadius: '100px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            background: mode === 'twofactor' ? '#FEF3C7' : '#F1F5F9',
+                            color: mode === 'twofactor' ? '#B45309' : '#64748B',
+                        }}>
+                            <ShieldCheckIcon />
+                            <span>Step 2: 2FA</span>
+                        </div>
                     </div>
                 )}
 
-                {/* Mode 1: Password Login */}
-                {mode === 'password' && (
-                    <form onSubmit={handlePasswordLogin} className="login-form">
+                {/* Step 1: Email & Password */}
+                {mode === 'credentials' && (
+                    <form onSubmit={handleCredentialsSubmit} className="login-form">
                         {(error || customError) && (
                             <div className="login-error">{customError || formatAuthError(error)}</div>
                         )}
@@ -412,119 +447,114 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        <button type="submit" className="login-btn" disabled={loading}>
-                            {loading ? 'Signing in…' : 'Sign in'}
+                        <button type="submit" className="login-btn" disabled={loading || sendingOtp}>
+                            {loading || sendingOtp ? 'Verifying credentials…' : 'Continue to 2FA Verification →'}
                         </button>
                     </form>
                 )}
 
-                {/* Mode 2: Email OTP Login */}
-                {mode === 'otp' && (
-                    <div className="login-form">
+                {/* Step 2: Two-Factor (2FA) Email OTP Verification */}
+                {mode === 'twofactor' && (
+                    <form onSubmit={handleVerifyOtp} className="login-form">
                         {(error || customError) && (
                             <div className="login-error">{customError || formatAuthError(error)}</div>
                         )}
                         {notice && <div className="login-success">{notice}</div>}
 
-                        {otpStep === 'request' ? (
-                            <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div className="form-group">
-                                    <label htmlFor="otp-email">Registered Email Address</label>
+                        <div style={{
+                            background: '#F8FAFC',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '10px',
+                            padding: '12px 16px',
+                            textAlign: 'center',
+                            fontSize: '13px',
+                            color: '#475569',
+                            lineHeight: 1.5,
+                        }}>
+                            <span>Enter the 6-digit security code sent to </span>
+                            <strong style={{ color: '#0F172A', wordBreak: 'break-all' }}>{email}</strong>
+                        </div>
+
+                        <div className="form-group" style={{ marginTop: '4px' }}>
+                            <label style={{ textAlign: 'center', marginBottom: '8px', display: 'block', fontSize: '13px', fontWeight: 600 }}>
+                                6-Digit Verification Code
+                            </label>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    gap: '8px',
+                                    justifyContent: 'center',
+                                }}
+                                onPaste={handleOtpPaste}
+                            >
+                                {otpDigits.map((digit, idx) => (
                                     <input
-                                        id="otp-email"
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="owner@restaurant.com"
-                                        autoComplete="email"
-                                        required
+                                        key={idx}
+                                        ref={otpRefs[idx]}
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={1}
+                                        value={digit}
+                                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                                        style={{
+                                            width: '46px',
+                                            height: '52px',
+                                            textAlign: 'center',
+                                            fontSize: '22px',
+                                            fontWeight: '700',
+                                            borderRadius: '8px',
+                                            border: '1.5px solid var(--border)',
+                                            background: 'var(--surface-2)',
+                                            color: 'var(--text)',
+                                        }}
                                     />
-                                </div>
-                                <button type="submit" className="login-btn" disabled={sendingOtp}>
-                                    {sendingOtp ? 'Sending OTP…' : 'Send Verification Code ✉️'}
-                                </button>
-                            </form>
-                        ) : (
-                            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                                <div className="form-group">
-                                    <label style={{ textAlign: 'center', marginBottom: '8px', display: 'block' }}>
-                                        Enter 6-Digit Code
-                                    </label>
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            gap: '8px',
-                                            justifyContent: 'center',
-                                        }}
-                                        onPaste={handleOtpPaste}
-                                    >
-                                        {otpDigits.map((digit, idx) => (
-                                            <input
-                                                key={idx}
-                                                ref={otpRefs[idx]}
-                                                type="text"
-                                                inputMode="numeric"
-                                                maxLength={1}
-                                                value={digit}
-                                                onChange={(e) => handleOtpChange(idx, e.target.value)}
-                                                onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                                                style={{
-                                                    width: '44px',
-                                                    height: '50px',
-                                                    textAlign: 'center',
-                                                    fontSize: '20px',
-                                                    fontWeight: '700',
-                                                    borderRadius: '8px',
-                                                    border: '1.5px solid var(--border)',
-                                                    background: 'var(--surface-2)',
-                                                    color: 'var(--text)',
-                                                }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
+                                ))}
+                            </div>
+                        </div>
 
-                                <button type="submit" className="login-btn" disabled={loading}>
-                                    Verify & Sign In →
-                                </button>
+                        <button type="submit" className="login-btn" disabled={verifyingOtp || loading}>
+                            {verifyingOtp ? 'Verifying Code…' : 'Verify & Access Dashboard →'}
+                        </button>
 
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginTop: '6px' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOtpStep('request')}
-                                        style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }}
-                                    >
-                                        ← Change email
-                                    </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginTop: '6px' }}>
+                            <button
+                                type="button"
+                                onClick={handleBackToCredentials}
+                                style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', fontWeight: 500 }}
+                            >
+                                ← Switch account
+                            </button>
 
-                                    <button
-                                        type="button"
-                                        disabled={resendTimer > 0 || sendingOtp}
-                                        onClick={handleSendOtp}
-                                        style={{
-                                            background: 'none',
-                                            border: 'none',
-                                            color: resendTimer > 0 ? '#94A3B8' : 'var(--accent, #E8A54B)',
-                                            fontWeight: 600,
-                                            cursor: resendTimer > 0 ? 'default' : 'pointer',
-                                        }}
-                                    >
-                                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-                    </div>
+                            <button
+                                type="button"
+                                disabled={resendTimer > 0 || sendingOtp}
+                                onClick={() => triggerSendOtp(email)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: resendTimer > 0 ? '#94A3B8' : 'var(--accent, #E8A54B)',
+                                    fontWeight: 600,
+                                    cursor: resendTimer > 0 ? 'default' : 'pointer',
+                                }}
+                            >
+                                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}
+                            </button>
+                        </div>
+                    </form>
                 )}
 
                 {/* Mode 3: Forgot Password */}
                 {mode === 'forgot' && (
                     <form onSubmit={handleForgot} className="login-form">
                         <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px', textAlign: 'center' }}>
-                            Enter your registered email and we'll send you a link to set a new password.
+                            Enter your registered email and we'll send you a link to reset your password.
                         </p>
 
                         {notice && <div className="login-success">{notice}</div>}
+                        {(error || customError) && (
+                            <div className="login-error">{customError || formatAuthError(error)}</div>
+                        )}
 
                         <div className="form-group">
                             <label htmlFor="forgot-email">Email address</label>
@@ -540,10 +570,10 @@ export default function LoginPage() {
                         </div>
 
                         <button type="submit" className="login-btn" disabled={loading}>
-                            {loading ? 'Sending…' : 'Send reset link'}
+                            {loading ? 'Sending link…' : 'Send reset link'}
                         </button>
 
-                        <div className="otp-footer" style={{ justifyContent: 'center' }}>
+                        <div className="otp-footer" style={{ justifyContent: 'center', marginTop: '8px' }}>
                             <button
                                 type="button"
                                 className="back-btn"
@@ -551,7 +581,7 @@ export default function LoginPage() {
                                     clearError();
                                     setCustomError('');
                                     setNotice('');
-                                    setMode('password');
+                                    setMode('credentials');
                                 }}
                             >
                                 ← Back to sign in

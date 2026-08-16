@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
 export default function ProtectedRoute({ children }) {
-    const { user, restaurantId, accountStatus, initialising } = useAuthStore();
+    const { user, restaurantId, accountStatus, initialising, twoFactorVerified } = useAuthStore();
 
     // Firebase hasn't reported the restored session yet — don't bounce to /login
     // before we know whether there is one.
@@ -23,6 +23,11 @@ export default function ProtectedRoute({ children }) {
     // /login, which shows the "awaiting activation" state — never an empty or,
     // worse, another tenant's dashboard.
     if (!restaurantId || accountStatus !== 'active') {
+        return <Navigate to="/login" replace />;
+    }
+
+    // Require 2FA verification in current session
+    if (!twoFactorVerified) {
         return <Navigate to="/login" replace />;
     }
 

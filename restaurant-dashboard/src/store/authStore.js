@@ -26,6 +26,7 @@ const EMPTY_SESSION = {
     restaurantId: null,
     restaurantName: null,
     accountStatus: null,
+    twoFactorVerified: false,
 };
 
 const useAuthStore = create((set, get) => ({
@@ -51,6 +52,7 @@ const useAuthStore = create((set, get) => ({
                 return;
             }
 
+            const is2fa = sessionStorage.getItem(`sno_2fa_${firebaseUser.uid}`) === 'true';
             const userObj = { uid: firebaseUser.uid, email: firebaseUser.email };
             const userDocRef = doc(db, 'users', firebaseUser.uid);
 
@@ -63,6 +65,7 @@ const useAuthStore = create((set, get) => ({
                             ...EMPTY_SESSION,
                             user: userObj,
                             accountStatus: 'unprovisioned',
+                            twoFactorVerified: is2fa,
                             initialising: false,
                             loading: false,
                         });
@@ -81,6 +84,7 @@ const useAuthStore = create((set, get) => ({
                         restaurantId: data.restaurantId ?? null,
                         restaurantName: data.restaurantName ?? null,
                         accountStatus: data.status ?? 'active',
+                        twoFactorVerified: is2fa,
                         initialising: false,
                         loading: false,
                         error: null,
@@ -96,6 +100,18 @@ const useAuthStore = create((set, get) => ({
         });
     },
 
+    setTwoFactorVerified: (verified) => {
+        const user = get().user;
+        if (user?.uid) {
+            if (verified) {
+                sessionStorage.setItem(`sno_2fa_${user.uid}`, 'true');
+            } else {
+                sessionStorage.removeItem(`sno_2fa_${user.uid}`);
+            }
+        }
+        set({ twoFactorVerified: !!verified });
+    },
+
     login: async (email, password) => {
         set({ loading: true, error: null });
         try {
@@ -108,6 +124,10 @@ const useAuthStore = create((set, get) => ({
     },
 
     logout: async () => {
+        const user = get().user;
+        if (user?.uid) {
+            sessionStorage.removeItem(`sno_2fa_${user.uid}`);
+        }
         const unsubscribe = get().unsubscribeProfile;
         if (unsubscribe) unsubscribe();
         try {
@@ -132,10 +152,10 @@ const useAuthStore = create((set, get) => ({
     setError: (error) => set({ error }),
     clearError: () => set({ error: null }),
     isAuthenticated: () => !!get().user,
-    /** True only when the account is provisioned and allowed into the dashboard. */
+    /** True only when the account is provisioned, active, and passed 2FA. */
     hasDashboardAccess: () => {
-        const { restaurantId, accountStatus } = get();
-        return !!restaurantId && accountStatus === 'active';
+        const { restaurantId, accountStatus, twoFactorVerified } = get();
+        return !!restaurantId && accountStatus === 'active' && !!twoFactorVerified;
     },
 }));
 
